@@ -1,0 +1,28 @@
+# Gradle
+.gradle/
+build/
+
+# Java
+*.class
+out/
+
+# IntelliJ / Antigravity
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# Environment Files
+.env
+
+# Database Config
+config/application.properties
+config/hikari.properties
+
+# OS Files
+.DS_Store
+Thumbs.db
