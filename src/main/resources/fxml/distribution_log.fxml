@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<!-- Read-Only Resource Movement History (Distribution Log)
+     Target Roles: Warehouse Manager, System Admin, Analytics User
+     Key Features: Partitioned date range filter, read-only transfer TableView
+                   Table is range-partitioned by distributed_at for efficient queries
+     Layout: Adapted from Hostel-Management-System allocation.fxml pattern -->
+<BorderPane minHeight="600.0" minWidth="900.0" prefHeight="850.0" prefWidth="1300.0"
+            xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.groupa13.disasterrelief.controller.DistributionLogController">
+   <top>
+      <HBox alignment="CENTER_LEFT" minHeight="72.0" spacing="20.0" styleClass="header-bar" BorderPane.alignment="CENTER">
+         <padding>
+            <Insets bottom="12.0" left="16.0" right="16.0" top="12.0" />
+         </padding>
+         <children>
+            <Button mnemonicParsing="false" onAction="#goBack" styleClass="btn-back" text="Dashboard">
+               <graphic>
+                  <FontIcon iconLiteral="fas-arrow-left" styleClass="icon-sm" />
+               </graphic>
+            </Button>
+            <Label styleClass="page-title" text="Resource Distribution Log" />
+            <Label fx:id="roleBadge" styleClass="role-badge-warehouse" text="" />
+         </children>
+      </HBox>
+   </top>
+   <left>
+      <ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" maxWidth="420.0" minWidth="280.0" prefWidth="380.0" vbarPolicy="AS_NEEDED" BorderPane.alignment="CENTER">
+         <content>
+            <VBox minWidth="280.0" spacing="4.0" styleClass="form-panel panel-card">
+               <padding>
+                  <Insets bottom="40.0" left="12.0" right="12.0" top="12.0" />
+               </padding>
+               <children>
+                  <Label fx:id="errorLabel" maxWidth="1.7976931348623157E308" minHeight="18.0" styleClass="login-error" text="" wrapText="true" />
+
+                  <Label styleClass="section-title" text="Date Range Filter" />
+                  <Label styleClass="text-muted" text="Efficient filtering via monthly table partitions" />
+
+                  <!-- Date range filter — leverages PostgreSQL table partitioning -->
+                  <Label styleClass="field-label" text="From Date (yyyy-MM-dd)" />
+                  <TextField fx:id="dateFromField" promptText="e.g. 2026-07-01" />
+
+                  <Label styleClass="field-label" text="To Date (yyyy-MM-dd)" />
+                  <TextField fx:id="dateToField" promptText="e.g. 2026-07-31" />
+
+                  <Separator prefWidth="200.0" />
+
+                  <Label styleClass="section-title" text="Search by ID" />
+
+                  <Label styleClass="field-label" text="Log ID" />
+                  <TextField fx:id="logIdField" promptText="Enter log ID" />
+
+                  <Separator prefWidth="200.0" />
+
+                  <!-- Filter/Search Buttons (read-only — no create/update/delete) -->
+                  <HBox minHeight="48.0" spacing="8.0">
+                     <children>
+                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleFilterByDate" styleClass="btn-primary" text="Filter by Date Range" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-calendar-alt" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                     </children>
+                  </HBox>
+                  <HBox minHeight="48.0" spacing="8.0">
+                     <children>
+                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleFindById" styleClass="btn-neutral" text="Find by Log ID" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-search" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                     </children>
+                  </HBox>
+                  <HBox minHeight="48.0" spacing="8.0">
+                     <children>
+                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleShowAll" styleClass="btn-neutral" text="Show All Transfers" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-list" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleClear" styleClass="btn-outline" text="Clear" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-eraser" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                     </children>
+                  </HBox>
+               </children>
+            </VBox>
+         </content>
+      </ScrollPane>
+   </left>
+   <center>
+      <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" spacing="10.0" styleClass="content-area panel-card" BorderPane.alignment="CENTER">
+         <padding>
+            <Insets bottom="24.0" left="16.0" right="16.0" top="16.0" />
+         </padding>
+         <children>
+            <TableView fx:id="logTable" minHeight="200.0" minWidth="400.0" VBox.vgrow="ALWAYS">
+               <columns>
+                  <TableColumn fx:id="colLogId" minWidth="64.0" prefWidth="70.0" text="Log ID" />
+                  <TableColumn fx:id="colSourceShelter" minWidth="120.0" prefWidth="180.0" text="From Shelter" />
+                  <TableColumn fx:id="colDestShelter" minWidth="120.0" prefWidth="180.0" text="To Shelter" />
+                  <TableColumn fx:id="colResourceName" minWidth="100.0" prefWidth="160.0" text="Resource" />
+                  <TableColumn fx:id="colQuantity" minWidth="60.0" prefWidth="80.0" text="Qty" />
+                  <TableColumn fx:id="colDistributedAt" minWidth="160.0" prefWidth="200.0" text="Distributed At" />
+               </columns>
+            </TableView>
+         </children>
+      </VBox>
+   </center>
+</BorderPane>

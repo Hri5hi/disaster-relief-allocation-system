@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<!-- Volunteer Directory & Skill Matching
+     Target Roles: Volunteer Coordinator, System Admin
+     Key Features: TEXT[] skills search, availability search, zone assignment
+     Layout: Adapted from Hostel-Management-System student.fxml pattern -->
+<BorderPane minHeight="600.0" minWidth="900.0" prefHeight="850.0" prefWidth="1200.0"
+            xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.groupa13.disasterrelief.controller.VolunteerController">
+   <top>
+      <HBox alignment="CENTER_LEFT" minHeight="72.0" spacing="20.0" styleClass="header-bar" BorderPane.alignment="CENTER">
+         <padding>
+            <Insets bottom="12.0" left="16.0" right="16.0" top="12.0" />
+         </padding>
+         <children>
+            <Button mnemonicParsing="false" onAction="#goBack" styleClass="btn-back" text="Dashboard">
+               <graphic>
+                  <FontIcon iconLiteral="fas-arrow-left" styleClass="icon-sm" />
+               </graphic>
+            </Button>
+            <Label styleClass="page-title" text="Volunteer Directory" />
+            <Label fx:id="roleBadge" styleClass="role-badge-volunteer" text="" />
+         </children>
+      </HBox>
+   </top>
+   <left>
+      <ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" maxWidth="420.0" minWidth="280.0" prefWidth="380.0" vbarPolicy="AS_NEEDED" BorderPane.alignment="CENTER">
+         <content>
+            <VBox minWidth="280.0" spacing="4.0" styleClass="form-panel panel-card">
+               <padding>
+                  <Insets bottom="40.0" left="12.0" right="12.0" top="12.0" />
+               </padding>
+               <children>
+                  <Label fx:id="errorLabel" maxWidth="1.7976931348623157E308" minHeight="18.0" styleClass="login-error" text="" wrapText="true" />
+
+                  <!-- Volunteer ID (person_id — auto-generated on add, required for update/delete/find) -->
+                  <Label styleClass="field-label" text="Volunteer ID" />
+                  <TextField fx:id="personIdField" promptText="Auto-generated on Add, enter for Update/Find" />
+
+                  <Label styleClass="field-label" text="Name" />
+                  <TextField fx:id="nameField" promptText="Full name" />
+
+                  <Label styleClass="field-label" text="Contact" />
+                  <TextField fx:id="contactField" promptText="Phone number" />
+
+                  <Label styleClass="field-label" text="Email" />
+                  <TextField fx:id="emailField" promptText="Email address" />
+
+                  <!-- Skills — PostgreSQL TEXT[] array input -->
+                  <Label styleClass="field-label" text="Skills (comma-separated)" />
+                  <TextField fx:id="skillsField" promptText="e.g. first_aid, driving, cooking" />
+
+                  <!-- Availability — PostgreSQL tsrange input -->
+                  <Label styleClass="field-label" text="Availability (tsrange)" />
+                  <TextField fx:id="availabilityField" promptText="e.g. [2026-07-09 08:00, 2026-07-20 18:00)" />
+
+                  <!-- Zone Assignment -->
+                  <Label styleClass="field-label" text="Assigned Zone" />
+                  <ComboBox fx:id="zoneCombo" maxWidth="1.7976931348623157E308" promptText="Select zone..." />
+
+                  <Separator prefWidth="200.0" />
+
+                  <!-- CRUD Buttons -->
+                  <HBox minHeight="48.0" spacing="8.0">
+                     <children>
+                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleAdd" styleClass="btn-primary" text="Register" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-user-plus" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleUpdate" styleClass="btn-success" text="Update" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-user-edit" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                     </children>
+                  </HBox>
+                  <HBox minHeight="48.0" spacing="8.0">
+                     <children>
+                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleDelete" styleClass="btn-danger" text="Remove" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-user-times" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleFind" styleClass="btn-neutral" text="Find" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-search" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                     </children>
+                  </HBox>
+                  <HBox minHeight="48.0" spacing="8.0">
+                     <children>
+                        <!-- Skill-based search — key feature for Volunteer Coordinator -->
+                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleSearchBySkill" styleClass="btn-neutral" text="Search by Skill" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-tools" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleClear" styleClass="btn-outline" text="Clear" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-eraser" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                     </children>
+                  </HBox>
+               </children>
+            </VBox>
+         </content>
+      </ScrollPane>
+   </left>
+   <center>
+      <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" spacing="10.0" styleClass="content-area panel-card" BorderPane.alignment="CENTER">
+         <padding>
+            <Insets bottom="24.0" left="16.0" right="16.0" top="16.0" />
+         </padding>
+         <children>
+            <TableView fx:id="volunteerTable" minHeight="200.0" minWidth="400.0" VBox.vgrow="ALWAYS">
+               <columns>
+                  <TableColumn fx:id="colPersonId" minWidth="64.0" prefWidth="80.0" text="ID" />
+                  <TableColumn fx:id="colName" minWidth="100.0" prefWidth="150.0" text="Name" />
+                  <TableColumn fx:id="colContact" minWidth="90.0" prefWidth="120.0" text="Contact" />
+                  <TableColumn fx:id="colEmail" minWidth="120.0" prefWidth="170.0" text="Email" />
+                  <TableColumn fx:id="colSkills" minWidth="140.0" prefWidth="200.0" text="Skills" />
+                  <TableColumn fx:id="colAvailability" minWidth="160.0" prefWidth="220.0" text="Availability" />
+                  <TableColumn fx:id="colZone" minWidth="100.0" prefWidth="140.0" text="Assigned Zone" />
+               </columns>
+            </TableView>
+         </children>
+      </VBox>
+   </center>
+</BorderPane>

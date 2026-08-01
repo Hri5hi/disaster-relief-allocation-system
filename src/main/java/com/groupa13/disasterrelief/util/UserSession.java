@@ -1,19 +1,24 @@
 package com.groupa13.disasterrelief.util;
 
 /**
- * Singleton session context — holds the identity, role, and zone (if applicable)
- * of the currently authenticated user for the lifetime of the application session.
+ * Singleton session context — holds the identity, role, and zone (if
+ * applicable)
+ * of the currently authenticated user for the lifetime of the application
+ * session.
  *
- * <p>Usage pattern:
+ * <p>
+ * Usage pattern:
+ * 
  * <pre>
- *   UserSession session = UserSession.getInstance();
- *   session.setUserId(userId);
- *   session.setUserName(displayName);
- *   session.setRole(UserRole.ZONE_COORDINATOR);
- *   session.setAssignedZoneId(3); // non-null only for ZONE_COORDINATOR
+ * UserSession session = UserSession.getInstance();
+ * session.setUserId(userId);
+ * session.setUserName(displayName);
+ * session.setRole(UserRole.ZONE_COORDINATOR);
+ * session.setAssignedZoneId(3); // non-null only for ZONE_COORDINATOR
  * </pre>
  *
- * <p>Call {@link #clear()} on logout to reset the session.
+ * <p>
+ * Call {@link #clear()} on logout to reset the session.
  *
  * @author Developer A
  */
