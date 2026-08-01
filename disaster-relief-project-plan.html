@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Disaster Relief Resource Allocation System — Project Brief</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #12161B;
+    --panel: #1B2129;
+    --panel-2: #212832;
+    --line: #2C3440;
+    --paper: #E9E6DD;
+    --ink: #E9E6DD;
+    --ink-dim: #9CA6B2;
+    --amber: #E8A33D;
+    --amber-dim: #6b5327;
+    --red: #D6555A;
+    --red-dim: #5a2a2c;
+    --teal: #48AFA0;
+    --teal-dim: #22463f;
+    --blue: #6C93C4;
+    --blue-dim: #263a52;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Source Sans 3', sans-serif;
+    line-height:1.6;
+  }
+  h1,h2,h3,h4{
+    font-family:'Big Shoulders Display', sans-serif;
+    font-weight:800;
+    letter-spacing:0.01em;
+    margin:0;
+    color:var(--paper);
+    text-transform:uppercase;
+  }
+  code, .mono{font-family:'JetBrains Mono', monospace;}
+  a{color:var(--amber);}
+
+  /* ---------- Top bar ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:50;
+    background:rgba(18,22,27,0.92);
+    backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 28px;
+  }
+  .topbar .brand{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.18em;
+    color:var(--amber);
+    text-transform:uppercase;
+  }
+  .topbar nav{display:flex; gap:22px; flex-wrap:wrap;}
+  .topbar nav a{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11.5px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--ink-dim);
+    text-decoration:none;
+    border-bottom:1px solid transparent;
+    padding-bottom:2px;
+  }
+  .topbar nav a:hover{color:var(--paper); border-color:var(--amber);}
+
+  /* ---------- Hero ---------- */
+  .hero{
+    padding:88px 28px 60px;
+    max-width:1100px;
+    margin:0 auto;
+    border-bottom:1px solid var(--line);
+  }
+  .hero .eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.22em;
+    color:var(--red);
+    text-transform:uppercase;
+    display:flex; align-items:center; gap:10px;
+    margin-bottom:18px;
+  }
+  .eyebrow .dot{width:8px; height:8px; border-radius:50%; background:var(--red); box-shadow:0 0 0 4px var(--red-dim); animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+  .hero h1{
+    font-size:clamp(38px, 6.2vw, 76px);
+    line-height:0.98;
+    max-width:900px;
+  }
+  .hero .sub{
+    margin-top:22px;
+    max-width:640px;
+    color:var(--ink-dim);
+    font-size:17px;
+  }
+  .legend{
+    display:flex; gap:10px; flex-wrap:wrap; margin-top:34px;
+  }
+  .tag{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    padding:6px 12px;
+    border-radius:3px;
+    border:1px solid;
+    white-space:nowrap;
+  }
+  .tag.critical{color:var(--red); border-color:var(--red-dim); background:rgba(214,85,90,0.08);}
+  .tag.high{color:var(--amber); border-color:var(--amber-dim); background:rgba(232,163,61,0.08);}
+  .tag.medium{color:var(--blue); border-color:var(--blue-dim); background:rgba(108,147,196,0.08);}
+  .tag.low{color:var(--teal); border-color:var(--teal-dim); background:rgba(72,175,160,0.08);}
+
+  /* ---------- Sections ---------- */
+  section{
+    max-width:1100px;
+    margin:0 auto;
+    padding:70px 28px;
+    border-bottom:1px solid var(--line);
+  }
+  .section-head{
+    display:flex; align-items:baseline; gap:16px; margin-bottom:36px;
+  }
+  .section-head .num{
+    font-family:'JetBrains Mono', monospace;
+    color:var(--ink-dim);
+    font-size:13px;
+  }
+  .section-head h2{font-size:clamp(26px,3.4vw,40px);}
+  p.lead{color:var(--ink-dim); max-width:720px; font-size:16px; margin-bottom:28px;}
+
+  /* ---------- Concept cards ---------- */
+  .grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:16px;}
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:22px;
+  }
+  .card h3{
+    font-size:20px;
+    color:var(--paper);
+    margin-bottom:10px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .card p{color:var(--ink-dim); font-size:14.5px; margin:0 0 12px;}
+  .card pre{
+    background:#0E1116;
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:12px 14px;
+    font-size:12.5px;
+    overflow-x:auto;
+    color:#c8e6c9;
+    margin:0;
+  }
+  .card .kw{color:#7fb0e0;}
+  .card .str{color:#e0b85c;}
+  .card .com{color:#6b7480;}
+
+  /* ---------- Architecture ---------- */
+  .arch{
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    gap:20px;
+    align-items:stretch;
+    margin-top:10px;
+  }
+  .arch-box{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:22px;
+  }
+  .arch-box h4{color:var(--paper); font-size:18px; margin-bottom:14px;}
+  .arch-box ul{margin:0; padding-left:18px; color:var(--ink-dim); font-size:14px;}
+  .arch-box li{margin-bottom:8px;}
+  .arch-arrow{
+    display:flex; align-items:center; justify-content:center;
+    font-family:'JetBrains Mono',monospace; color:var(--amber); font-size:22px;
+  }
+  .old .arch-box{border-color:var(--red-dim);}
+  .new .arch-box{border-color:var(--teal-dim);}
+  .badge-old, .badge-new{
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.08em;
+    text-transform:uppercase; padding:3px 9px; border-radius:3px; display:inline-block; margin-bottom:10px;
+  }
+  .badge-old{color:var(--red); background:rgba(214,85,90,0.1);}
+  .badge-new{color:var(--teal); background:rgba(72,175,160,0.1);}
+
+  /* ---------- Table ---------- */
+  .table-wrap{overflow-x:auto; border:1px solid var(--line); border-radius:6px;}
+  table{border-collapse:collapse; width:100%; min-width:900px; font-size:14px;}
+  thead th{
+    text-align:left; background:var(--panel-2);
+    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.06em;
+    text-transform:uppercase; color:var(--ink-dim);
+    padding:12px 16px; border-bottom:1px solid var(--line);
+  }
+  tbody td{
+    padding:14px 16px; border-bottom:1px solid var(--line); vertical-align:top; color:var(--ink);
+  }
+  tbody tr:hover{background:rgba(255,255,255,0.02);}
+  tbody td.mod{color:var(--paper); font-weight:600; white-space:nowrap;}
+  tbody td .desc{color:var(--ink-dim); font-size:13px;}
+  code.field{
+    font-size:12px; background:#0E1116; padding:2px 6px; border-radius:3px; color:var(--teal);
+  }
+
+  /* ---------- Roadmap ---------- */
+  .phase{
+    display:grid; grid-template-columns:64px 1fr; gap:20px; padding:24px 0; border-bottom:1px solid var(--line);
+  }
+  .phase:last-child{border-bottom:none;}
+  .phase-num{
+    font-family:'Big Shoulders Display', sans-serif; font-weight:800; font-size:42px; color:var(--line);
+  }
+  .phase h4{font-size:20px; color:var(--paper); margin-bottom:6px;}
+  .phase .meta{
+    font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--amber);
+    letter-spacing:0.05em; text-transform:uppercase; margin-bottom:10px;
+  }
+  .phase ul{margin:0; padding-left:18px; color:var(--ink-dim); font-size:14.5px;}
+  .phase li{margin-bottom:6px;}
+
+  /* ---------- Schema list ---------- */
+  .schema-group{
+    background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:20px 22px; margin-bottom:14px;
+  }
+  .schema-group h4{color:var(--paper); font-size:17px; margin-bottom:10px;}
+  .schema-tables{display:flex; flex-wrap:wrap; gap:8px;}
+  .schema-tables span{
+    font-family:'JetBrains Mono', monospace; font-size:12.5px; color:var(--teal);
+    background:rgba(72,175,160,0.08); border:1px solid var(--teal-dim);
+    padding:4px 10px; border-radius:3px;
+  }
+
+  footer{
+    max-width:1100px; margin:0 auto; padding:40px 28px 80px;
+    color:var(--ink-dim); font-size:13px;
+  }
+  .callout{
+    border-left:3px solid var(--amber); background:rgba(232,163,61,0.06);
+    padding:16px 20px; border-radius:0 6px 6px 0; margin:20px 0; color:var(--ink-dim); font-size:14.5px;
+  }
+  .callout strong{color:var(--paper);}
+
+  @media (max-width: 720px){
+    .arch{grid-template-columns:1fr;}
+    .arch-arrow{transform:rotate(90deg); padding:6px 0;}
+    .topbar nav{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">◈ Proposal D / Field Manual</div>
+  <nav>
+    <a href="#concept">Concept</a>
+    <a href="#basics">Postgres Basics</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#functions">Functionalities</a>
+    <a href="#schema">Schema</a>
+    <a href="#roadmap">Roadmap</a>
+  </nav>
+</div>
+
+<div class="hero">
+  <div class="eyebrow"><span class="dot"></span> DBMS Course Project — PostgreSQL</div>
+  <h1>Disaster Relief Resource Allocation System</h1>
+  <p class="sub">A relief coordination platform where shelters, volunteers, donations, and supplies are tracked and matched to zones in need — with almost all of the intelligence living inside PostgreSQL instead of in application code.</p>
+  <div class="legend">
+    <span class="tag critical">Critical — must ship</span>
+    <span class="tag high">High — strongly recommended</span>
+    <span class="tag medium">Medium — good to have</span>
+    <span class="tag low">Stretch — if time allows</span>
+  </div>
+</div>
+
+<section id="concept">
+  <div class="section-head"><span class="num">01</span><h2>What you're actually building</h2></div>
+  <p class="lead">In plain terms, before any SQL: imagine a hurricane hits a coastline. Several shelters open up. Each one has some food, water, and medicine — but never the right amount in the right place. Volunteers show up and need to be assigned somewhere. Donations pour in. Someone has to decide, minute by minute, which shelter sends its spare blankets to which other shelter that's run out. That decision-making — not the pretty screens around it — is the database.</p>
+
+  <div class="grid">
+    <div class="card">
+      <h3>🏚️ The problem it solves</h3>
+      <p>Relief coordinators need to know: which zones are short on what, which shelters have surplus, who's available to move supplies, and who's already been helped. Right now that's usually a spreadsheet. You're replacing the spreadsheet with a real database that enforces its own rules.</p>
+    </div>
+    <div class="card">
+      <h3>🧠 Where the "brain" lives</h3>
+      <p>In your old hostel project, Java decided everything and the database just stored rows. Here it flips: PostgreSQL functions decide whether an allocation is valid, triggers keep inventory numbers correct automatically, and constraints make certain bad states physically impossible to insert.</p>
+    </div>
+    <div class="card">
+      <h3>🎯 Why evaluators like this topic</h3>
+      <p>It naturally needs multi-table transactions (move stock from A to B safely), priority ranking (who gets help first), hierarchical data (resource categories), and real-time alerts (low stock) — all textbook DBMS material, none of it forced.</p>
+    </div>
+  </div>
+
+  <div class="callout"><strong>Beginner reassurance:</strong> you do not need to know PostgreSQL yet to start this. Section 02 below teaches every concept you'll touch, in plain English, with a two-line example each. You'll pick it up as you build rather than needing to "learn Postgres first."</div>
+</section>
+
+<section id="basics">
+  <div class="section-head"><span class="num">02</span><h2>PostgreSQL, explained for a beginner</h2></div>
+  <p class="lead">Every concept below shows up somewhere in this project. Read this once before you touch the schema — it'll make every later section click into place.</p>
+
+  <div class="grid">
+    <div class="card">
+      <h3>📋 Tables &amp; keys</h3>
+      <p>A table is a spreadsheet with strict rules. Every row needs a unique ID (<code class="field">PRIMARY KEY</code>). When one table points to a row in another (a shelter "belongs to" a zone), that's a <code class="field">FOREIGN KEY</code> — it stops you from linking to something that doesn't exist.</p>
+      <pre><span class="kw">CREATE TABLE</span> shelters (
+  shelter_id <span class="kw">SERIAL PRIMARY KEY</span>,
+  zone_id <span class="kw">INTEGER REFERENCES</span> zones(zone_id)
+);</pre>
+    </div>
+    <div class="card">
+      <h3>🔗 JOINs</h3>
+      <p>Real data lives in separate tables (shelters, resources, zones). A <code class="field">JOIN</code> stitches them back together for a query — e.g. "show me every shelter with its zone name" in one result, instead of two round trips from Java.</p>
+      <pre><span class="kw">SELECT</span> s.name, z.name
+<span class="kw">FROM</span> shelters s
+<span class="kw">JOIN</span> zones z <span class="kw">ON</span> s.zone_id = z.zone_id;</pre>
+    </div>
+    <div class="card">
+      <h3>🔒 CHECK constraints</h3>
+      <p>A rule the database enforces on every row, forever, no matter what inserts it — Java, a script, or you typing directly into psql. If you say quantity must be positive, the database itself refuses negative stock.</p>
+      <pre>quantity <span class="kw">INTEGER CHECK</span> (quantity >= 0),
+urgency <span class="kw">TEXT CHECK</span> (urgency <span class="kw">IN</span>
+  (<span class="str">'critical'</span>,<span class="str">'high'</span>,<span class="str">'medium'</span>,<span class="str">'low'</span>))</pre>
+    </div>
+    <div class="card">
+      <h3>⚙️ Stored functions / procedures</h3>
+      <p>Instead of Java doing "check stock → deduct → insert log → mark fulfilled" in four separate trips to the database, you write one PL/pgSQL function that does all four steps atomically inside Postgres. Java just calls it.</p>
+      <pre><span class="kw">SELECT * FROM</span>
+  fn_allocate_resources(
+    request_id, source_shelter);
+<span class="com">-- one call, everything happens inside</span></pre>
+    </div>
+    <div class="card">
+      <h3>🔔 Triggers</h3>
+      <p>Code that runs automatically whenever something happens to a table — no one has to remember to call it. "Whenever stock drops below the reorder level, insert an alert" is a trigger, not something Java has to check.</p>
+      <pre><span class="kw">CREATE TRIGGER</span> trg_low_stock
+<span class="kw">AFTER UPDATE ON</span> shelter_inventory
+<span class="kw">FOR EACH ROW EXECUTE FUNCTION</span>
+  fn_notify_low_stock();</pre>
+    </div>
+    <div class="card">
+      <h3>🧾 Transactions</h3>
+      <p>A group of steps that must all succeed or all fail together — never half-done. Moving 50 blankets from Shelter A to Shelter B is two updates; a transaction guarantees you never end up with the blankets "gone" from A but never arrived at B.</p>
+      <pre><span class="kw">BEGIN</span>;
+  <span class="kw">UPDATE</span> ... <span class="com">-- deduct from source</span>
+  <span class="kw">UPDATE</span> ... <span class="com">-- add to destination</span>
+<span class="kw">COMMIT</span>;</pre>
+    </div>
+    <div class="card">
+      <h3>👁️ Views &amp; materialized views</h3>
+      <p>A view is a saved query you can treat like a table — e.g. <code class="field">v_urgent_pending_requests</code> always shows current urgent requests. A materialized view is the same idea but the result is physically stored and refreshed on a schedule, for expensive reports.</p>
+      <pre><span class="kw">CREATE VIEW</span> v_low_stock <span class="kw">AS</span>
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> shelter_inventory
+<span class="kw">WHERE</span> quantity < reorder_level;</pre>
+    </div>
+    <div class="card">
+      <h3>🗂️ JSONB</h3>
+      <p>For data that doesn't fit neat columns — a volunteer's skills, a person's medical needs — Postgres lets you store flexible JSON in a column and still search inside it efficiently.</p>
+      <pre>medical_needs <span class="kw">JSONB</span>;
+<span class="com">-- {"conditions":["asthma"],"wheelchair":true}</span>
+<span class="kw">WHERE</span> medical_needs @> <span class="str">'{"wheelchair":true}'</span></pre>
+    </div>
+    <div class="card">
+      <h3>📦 Arrays</h3>
+      <p>A single column that holds a list — a volunteer's <code class="field">skills</code> can just be <code class="field">TEXT[]</code> instead of a whole separate table, when the list is short and simple.</p>
+      <pre>skills <span class="kw">TEXT[]</span>;
+<span class="kw">WHERE</span> <span class="str">'first_aid'</span> = <span class="kw">ANY</span>(skills)</pre>
+    </div>
+    <div class="card">
+      <h3>⏱️ Range types + exclusion constraints</h3>
+      <p>A column that stores a start-and-end span (a volunteer's shift) as one value. An exclusion constraint then makes overlapping shifts for the same volunteer <em>impossible to insert</em> — the database rejects it, no Java validation needed.</p>
+      <pre>duty_period <span class="kw">tsrange</span>,
+<span class="kw">EXCLUDE USING gist</span> (
+  volunteer_id <span class="kw">WITH</span> =,
+  duty_period <span class="kw">WITH</span> &&)</pre>
+    </div>
+    <div class="card">
+      <h3>📊 Window functions</h3>
+      <p>Ranking or running calculations "over a window" of rows without collapsing them into one — e.g. rank requests by urgency within each zone, or compute a 7-day rolling average, while still seeing every individual row.</p>
+      <pre><span class="kw">ROW_NUMBER() OVER</span> (
+  <span class="kw">PARTITION BY</span> zone_id
+  <span class="kw">ORDER BY</span> urgency <span class="kw">DESC</span>)</pre>
+    </div>
+    <div class="card">
+      <h3>🌳 Recursive CTEs</h3>
+      <p>A query that refers to itself to walk a hierarchy — e.g. "Medical → First Aid → Bandages" — rolling quantities up from the leaves to the top category in one query instead of a loop in Java.</p>
+      <pre><span class="kw">WITH RECURSIVE</span> cat_tree <span class="kw">AS</span> (
+  <span class="com">-- base case + recursive case</span>
+) <span class="kw">SELECT * FROM</span> cat_tree;</pre>
+    </div>
+  </div>
+</section>
+
+<section id="architecture">
+  <div class="section-head"><span class="num">03</span><h2>Where the logic lives</h2></div>
+  <p class="lead">This is the single biggest mindset shift from your last project. Compare the old way to the new way — this is what an evaluator is actually grading you on.</p>
+
+  <div class="arch">
+    <div class="old">
+      <div class="arch-box">
+        <span class="badge-old">Old pattern</span>
+        <h4>App does the thinking</h4>
+        <ul>
+          <li>Check if shelter has stock — in Java</li>
+          <li>Count current occupants — in Java</li>
+          <li>Build the allocation object — in Java</li>
+          <li>Database is just a filing cabinet</li>
+          <li>4–5 separate round trips per action</li>
+        </ul>
+      </div>
+    </div>
+    <div class="arch-arrow">→</div>
+    <div class="new">
+      <div class="arch-box">
+        <span class="badge-new">This project</span>
+        <h4>Database does the thinking</h4>
+        <ul>
+          <li>One function call: <code class="field">fn_allocate_resources()</code></li>
+          <li>Stock check, deduction, logging happen inside Postgres</li>
+          <li>Triggers auto-update inventory + raise alerts</li>
+          <li>Constraints make invalid states impossible</li>
+          <li>App layer just displays what comes back</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout"><strong>Note on the app layer:</strong> whether you keep the existing JavaFX shell, rebuild it as a simple web app, or use a CLI is a secondary decision — the grading weight is in the schema, functions, triggers, and constraints described below. Pick whichever front end lets you spend the least extra time so more of it goes into the database work.</div>
+</section>
+
+<section id="functions">
+  <div class="section-head"><span class="num">04</span><h2>Full functionality map</h2></div>
+  <p class="lead">Every functional module the system needs, what it actually lets a user do, which tables it touches, and the DBMS concept it's there to demonstrate. Priority tags tell you what to build first.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Module</th>
+          <th>What it does</th>
+          <th>Key tables</th>
+          <th>DBMS concept showcased</th>
+          <th>Priority</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mod">Disaster &amp; Zone Setup</td>
+          <td>Register a disaster event, define its affected zones and severity, mark it active/resolved.</td>
+          <td><code class="field">disasters</code>, <code class="field">disaster_zones</code></td>
+          <td class="desc">daterange for active period, table inheritance groundwork</td>
+          <td><span class="tag critical">Critical</span></td>
+        </tr>
+        <tr>
+          <td class="mod">People (base identity)</td>
+          <td>One shared identity record for anyone in the system — later specialised into volunteer, affected person, or coordinator.</td>
+          <td><code class="field">people</code>, <code class="field">volunteers</code>, <code class="field">affected_persons</code></td>
+          <td class="desc">Table inheritance (INHERITS) — mirrors your old Person→Student/Warden hierarchy at the DB level</td>
+          <td><span class="tag critical">Critical</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Shelter Management</td>
+          <td>Open/close shelters, track capacity vs. current occupancy, location, operating status.</td>
+          <td><code class="field">shelters</code>, <code class="field">shelter_capacity_log</code></td>
+          <td class="desc">Trigger-maintained occupancy counts, custom composite type for coordinates</td>
+          <td><span class="tag critical">Critical</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Resource Catalog</td>
+          <td>Define what resources exist (food, water, medicine, blankets) and their category hierarchy.</td>
+          <td><code class="field">resources</code>, <code class="field">resource_categories</code></td>
+          <td class="desc">Recursive CTE for category roll-up (Medical → First Aid → Bandages)</td>
+          <td><span class="tag critical">Critical</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Inventory Tracking</td>
+          <td>Live stock count per shelter per resource; auto-alert when a resource drops below its reorder level.</td>
+          <td><code class="field">shelter_inventory</code>, <code class="field">alerts</code></td>
+          <td class="desc">Trigger + <code class="field">LISTEN/NOTIFY</code> for real-time low-stock push alerts</td>
+          <td><span class="tag critical">Critical</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Resource Requests</td>
+          <td>A zone coordinator asks for a resource with an urgency level; requests queue until fulfilled.</td>
+          <td><code class="field">resource_requests</code></td>
+          <td class="desc">Window function priority ranking: <code class="field">ROW_NUMBER() OVER (PARTITION BY zone ORDER BY urgency)</code></td>
+          <td><span class="tag critical">Critical</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Resource Allocation</td>
+          <td>Move stock from a shelter with surplus to one in need, atomically, and log it.</td>
+          <td><code class="field">resource_allocations</code>, <code class="field">distribution_log</code></td>
+          <td class="desc">Multi-step transaction wrapped in a stored function; advisory locks to prevent double-allocation</td>
+          <td><span class="tag critical">Critical</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Volunteer Registry</td>
+          <td>Register volunteers, record their skills and certifications, assign them to a zone.</td>
+          <td><code class="field">volunteers</code></td>
+          <td class="desc">Array type (<code class="field">TEXT[]</code>) for skills; JSONB for certifications</td>
+          <td><span class="tag high">High</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Volunteer Scheduling</td>
+          <td>Assign volunteers to shifts without ever double-booking the same person across two zones.</td>
+          <td><code class="field">volunteer_shifts</code></td>
+          <td class="desc">Range type (<code class="field">tsrange</code>) + exclusion constraint (<code class="field">EXCLUDE USING gist</code>)</td>
+          <td><span class="tag high">High</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Donations Intake</td>
+          <td>Log incoming donations (items + quantities) from donors and route them into shelter inventory.</td>
+          <td><code class="field">donation_records</code></td>
+          <td class="desc">Batch <code class="field">UPSERT</code> (<code class="field">ON CONFLICT ... DO UPDATE</code>) into inventory</td>
+          <td><span class="tag high">High</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Affected Person Registration</td>
+          <td>Register someone displaced by the disaster, their medical needs, and which shelter they're in.</td>
+          <td><code class="field">affected_persons</code></td>
+          <td class="desc">JSONB with GIN index for querying medical needs (e.g. wheelchair-accessible matching)</td>
+          <td><span class="tag high">High</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Deficit &amp; Coverage Reports</td>
+          <td>Show which zones are short on what, and by how much, ranked by severity.</td>
+          <td>view over <code class="field">resource_requests</code> + <code class="field">shelter_inventory</code></td>
+          <td class="desc">Stored function returning a table (<code class="field">RETURNS TABLE</code>), CASE-based urgency scoring</td>
+          <td><span class="tag high">High</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Dashboards (views)</td>
+          <td>At-a-glance current state: occupancy, pending requests, active disasters, volunteer availability.</td>
+          <td><code class="field">v_shelter_dashboard</code>, <code class="field">v_pending_requests_ranked</code>, <code class="field">v_active_disasters</code></td>
+          <td class="desc">Plain SQL views — read-only, always current</td>
+          <td><span class="tag high">High</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Consumption &amp; Trend Analytics</td>
+          <td>Track resource usage over time and surface consumption trends per zone or disaster.</td>
+          <td><code class="field">mv_zone_resource_summary</code>, <code class="field">mv_daily_distribution_stats</code></td>
+          <td class="desc">Materialized views refreshed with <code class="field">CONCURRENTLY</code>; moving-average window functions</td>
+          <td><span class="tag medium">Medium</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Audit Trail</td>
+          <td>Automatically record who changed what, and when, across every important table — no app code involved.</td>
+          <td><code class="field">audit_log</code></td>
+          <td class="desc">Generic trigger fired on INSERT/UPDATE/DELETE across key tables</td>
+          <td><span class="tag medium">Medium</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Disaster Lifecycle Cascade</td>
+          <td>When a disaster is marked resolved, automatically cancel any of its still-pending requests.</td>
+          <td><code class="field">disasters</code> → <code class="field">resource_requests</code></td>
+          <td class="desc">Cascading trigger on status change</td>
+          <td><span class="tag medium">Medium</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Zone-based Access Control</td>
+          <td>A zone coordinator can only see and act on data for their own zone.</td>
+          <td>applies across zone-linked tables</td>
+          <td class="desc">Row-Level Security (RLS) policies</td>
+          <td><span class="tag low">Stretch</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Historical Partitioning</td>
+          <td>Keep the distribution log fast to query even after months of high-volume activity.</td>
+          <td><code class="field">distribution_log</code></td>
+          <td class="desc">Range partitioning by <code class="field">disaster_id</code> or month</td>
+          <td><span class="tag low">Stretch</span></td>
+        </tr>
+        <tr>
+          <td class="mod">Person Search</td>
+          <td>Search affected persons or volunteers by free-text (name, notes) quickly.</td>
+          <td><code class="field">people</code></td>
+          <td class="desc">Full-text search (<code class="field">tsvector</code>) — optional, smaller payoff here than in other proposals</td>
+          <td><span class="tag low">Stretch</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="schema">
+  <div class="section-head"><span class="num">05</span><h2>Schema at a glance</h2></div>
+  <p class="lead">Roughly 11–13 tables, grouped by the real-world concept they represent. This is the shape you're aiming for before you start writing DDL.</p>
+
+  <div class="schema-group">
+    <h4>People</h4>
+    <div class="schema-tables"><span>people</span><span>volunteers</span><span>affected_persons</span></div>
+  </div>
+  <div class="schema-group">
+    <h4>Disaster &amp; geography</h4>
+    <div class="schema-tables"><span>disasters</span><span>disaster_zones</span></div>
+  </div>
+  <div class="schema-group">
+    <h4>Shelters</h4>
+    <div class="schema-tables"><span>shelters</span><span>shelter_inventory</span><span>shelter_capacity_log</span></div>
+  </div>
+  <div class="schema-group">
+    <h4>Resources &amp; requests</h4>
+    <div class="schema-tables"><span>resources</span><span>resource_categories</span><span>resource_requests</span><span>resource_allocations</span><span>distribution_log</span></div>
+  </div>
+  <div class="schema-group">
+    <h4>Volunteering</h4>
+    <div class="schema-tables"><span>volunteer_shifts</span></div>
+  </div>
+  <div class="schema-group">
+    <h4>Donations &amp; oversight</h4>
+    <div class="schema-tables"><span>donation_records</span><span>alerts</span><span>audit_log</span></div>
+  </div>
+
+  <div class="callout"><strong>Relationship in one line:</strong> a <code class="field">disaster</code> has many <code class="field">zones</code>; each zone has a primary <code class="field">shelter</code>; each shelter tracks <code class="field">inventory</code> per resource; zones raise <code class="field">requests</code>, which are satisfied through <code class="field">allocations</code> that move stock between shelters and get written to the <code class="field">distribution_log</code>.</div>
+</section>
+
+<section id="roadmap">
+  <div class="section-head"><span class="num">06</span><h2>Build roadmap</h2></div>
+  <p class="lead">A sensible build order — each phase produces something demoable, so you're never stuck with "half a schema and nothing that runs."</p>
+
+  <div class="phase">
+    <div class="phase-num">01</div>
+    <div>
+      <div class="meta">~1 day</div>
+      <h4>Core schema + relationships</h4>
+      <ul>
+        <li>Create <code class="field">people</code>/<code class="field">volunteers</code>/<code class="field">affected_persons</code> with inheritance</li>
+        <li>Create <code class="field">disasters</code>, <code class="field">disaster_zones</code>, <code class="field">shelters</code>, <code class="field">resources</code></li>
+        <li>Add primary/foreign keys, basic <code class="field">CHECK</code> constraints, seed data</li>
+      </ul>
+    </div>
+  </div>
+  <div class="phase">
+    <div class="phase-num">02</div>
+    <div>
+      <div class="meta">~1 day</div>
+      <h4>Inventory &amp; requests</h4>
+      <ul>
+        <li>Add <code class="field">shelter_inventory</code>, <code class="field">resource_requests</code>, <code class="field">resource_categories</code></li>
+        <li>Write plain CRUD queries and confirm JOINs return sensible results</li>
+        <li>Add the recursive CTE for category roll-up</li>
+      </ul>
+    </div>
+  </div>
+  <div class="phase">
+    <div class="phase-num">03</div>
+    <div>
+      <div class="meta">~2 days</div>
+      <h4>Stored functions — the core logic</h4>
+      <ul>
+        <li><code class="field">fn_allocate_resources()</code> — the flagship transaction</li>
+        <li><code class="field">fn_zone_deficit_report()</code> — deficit/urgency query</li>
+        <li><code class="field">fn_register_volunteer()</code>, <code class="field">fn_assign_volunteer_shift()</code>, <code class="field">fn_process_donation()</code></li>
+      </ul>
+    </div>
+  </div>
+  <div class="phase">
+    <div class="phase-num">04</div>
+    <div>
+      <div class="meta">~1 day</div>
+      <h4>Triggers &amp; automation</h4>
+      <ul>
+        <li>Low-stock alert trigger + <code class="field">pg_notify</code></li>
+        <li>Audit log trigger across key tables</li>
+        <li>Occupancy auto-update, disaster-resolved cascade</li>
+      </ul>
+    </div>
+  </div>
+  <div class="phase">
+    <div class="phase-num">05</div>
+    <div>
+      <div class="meta">~1 day</div>
+      <h4>Views, ranking &amp; analytics</h4>
+      <ul>
+        <li>Dashboard views (occupancy, pending requests, active disasters)</li>
+        <li>Window-function priority ranking and trend queries</li>
+        <li>Materialized views for consumption summaries</li>
+      </ul>
+    </div>
+  </div>
+  <div class="phase">
+    <div class="phase-num">06</div>
+    <div>
+      <div class="meta">~1 day</div>
+      <h4>App layer + polish</h4>
+      <ul>
+        <li>Wire the front end (JavaFX, web, or CLI) to call the stored functions only</li>
+        <li>Add exclusion constraints for volunteer shifts, array types for skills</li>
+        <li>Write test data, demo script, and a short write-up of which PostgreSQL features you used and why</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Built as a study reference for the DBMS course group project — based on the Disaster Relief Resource Allocation System proposal. Share this with your teammates so everyone's building against the same plan.
+</footer>
+
+</body>
+</html>
