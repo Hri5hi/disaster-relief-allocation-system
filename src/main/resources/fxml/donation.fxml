@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<BorderPane minHeight="640.0" minWidth="1040.0" prefHeight="880.0" prefWidth="1250.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.groupa13.disasterrelief.controller.DonationController">
+   <top>
+      <HBox alignment="CENTER_LEFT" minHeight="72.0" spacing="20.0" styleClass="header-bar" BorderPane.alignment="CENTER">
+         <padding>
+            <Insets bottom="12.0" left="16.0" right="16.0" top="12.0" />
+         </padding>
+         <children>
+            <Button mnemonicParsing="false" onAction="#goBack" styleClass="btn-back" text="Dashboard">
+               <graphic>
+                  <FontIcon iconLiteral="fas-arrow-left" styleClass="icon-sm" />
+               </graphic>
+            </Button>
+            <Label styleClass="page-title" text="Donation Intake" />
+         </children>
+      </HBox>
+   </top>
+   <left>
+      <ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" maxWidth="460.0" minWidth="340.0" prefWidth="420.0" vbarPolicy="AS_NEEDED" BorderPane.alignment="CENTER">
+         <content>
+            <VBox minWidth="340.0" spacing="4.0" styleClass="form-panel panel-card">
+               <padding>
+                  <Insets bottom="40.0" left="12.0" right="12.0" top="12.0" />
+               </padding>
+               <children>
+                  <Label fx:id="errorLabel" maxWidth="1.7976931348623157E308" minHeight="18.0" styleClass="login-error" text="" wrapText="true" />
+
+                  <Label styleClass="field-label" text="Donation ID" />
+                  <TextField fx:id="donationIdField" promptText="Auto-generated on record" disable="true" editable="false" />
+
+                  <Label styleClass="field-label" text="Donor Name" />
+                  <TextField fx:id="donorNameField" promptText="e.g. Rotary Club of Kochi" />
+
+                  <Label styleClass="field-label" text="Receiving Shelter" />
+                  <ComboBox fx:id="receivingShelterCombo" maxWidth="1.7976931348623157E308" promptText="Select shelter" />
+
+                  <Separator prefWidth="200.0" />
+
+                  <Label styleClass="section-title" text="Items" />
+                  <HBox spacing="6.0">
+                     <children>
+                        <ComboBox fx:id="itemResourceCombo" maxWidth="1.7976931348623157E308" promptText="Resource" HBox.hgrow="ALWAYS" />
+                        <TextField fx:id="itemQuantityField" prefWidth="90.0" promptText="Qty" />
+                        <Button mnemonicParsing="false" onAction="#handleAddItem" styleClass="btn-primary" text="Add">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-plus" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                     </children>
+                  </HBox>
+
+                  <TableView fx:id="itemsTable" maxHeight="200.0" minHeight="120.0" prefHeight="160.0">
+                     <columns>
+                        <TableColumn fx:id="colItemResource" minWidth="140.0" prefWidth="220.0" text="Resource" />
+                        <TableColumn fx:id="colItemQuantity" minWidth="80.0" prefWidth="100.0" text="Quantity" />
+                     </columns>
+                  </TableView>
+                  <Button fx:id="btnRemoveItem" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleRemoveItem" styleClass="btn-outline" text="Remove Selected Item">
+                     <graphic>
+                        <FontIcon iconLiteral="fas-minus-circle" styleClass="icon-sm" />
+                     </graphic>
+                  </Button>
+
+                  <Separator prefWidth="200.0" />
+
+                  <Button fx:id="btnRecordDonation" maxWidth="1.7976931348623157E308" minHeight="48.0" mnemonicParsing="false" onAction="#handleRecordDonation" styleClass="btn-success" text="Record Donation">
+                     <graphic>
+                        <FontIcon iconLiteral="fas-gift" styleClass="icon-sm" />
+                     </graphic>
+                  </Button>
+                  <Button maxWidth="1.7976931348623157E308" minHeight="44.0" mnemonicParsing="false" onAction="#handleClear" styleClass="btn-outline" text="Clear">
+                     <graphic>
+                        <FontIcon iconLiteral="fas-eraser" styleClass="icon-sm" />
+                     </graphic>
+                  </Button>
+               </children>
+            </VBox>
+         </content>
+      </ScrollPane>
+   </left>
+   <center>
+      <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" spacing="10.0" styleClass="content-area panel-card" BorderPane.alignment="CENTER">
+         <padding>
+            <Insets bottom="24.0" left="16.0" right="16.0" top="16.0" />
+         </padding>
+         <children>
+            <Label styleClass="section-title" text="Donation History" />
+            <TableView fx:id="donationTable" minHeight="200.0" minWidth="400.0" VBox.vgrow="ALWAYS">
+               <columns>
+                  <TableColumn fx:id="colDonationId" minWidth="80.0" prefWidth="100.0" text="Donation ID" />
+                  <TableColumn fx:id="colDonorName" minWidth="140.0" prefWidth="200.0" text="Donor" />
+                  <TableColumn fx:id="colReceivingShelter" minWidth="140.0" prefWidth="220.0" text="Receiving Shelter" />
+                  <TableColumn fx:id="colItemsSummary" minWidth="180.0" prefWidth="280.0" text="Items" />
+                  <TableColumn fx:id="colReceivedAt" minWidth="120.0" prefWidth="150.0" text="Received At" />
+               </columns>
+            </TableView>
+         </children>
+      </VBox>
+   </center>
+</BorderPane>

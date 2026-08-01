@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<BorderPane minHeight="600.0" minWidth="1000.0" prefHeight="850.0" prefWidth="1200.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.groupa13.disasterrelief.controller.InventoryController">
+   <top>
+      <HBox alignment="CENTER_LEFT" minHeight="72.0" spacing="16.0" styleClass="header-bar" BorderPane.alignment="CENTER">
+         <padding>
+            <Insets bottom="12.0" left="16.0" right="16.0" top="12.0" />
+         </padding>
+         <children>
+            <Button mnemonicParsing="false" onAction="#goBack" styleClass="btn-back" text="Dashboard">
+               <graphic>
+                  <FontIcon iconLiteral="fas-arrow-left" styleClass="icon-sm" />
+               </graphic>
+            </Button>
+            <Label styleClass="page-title" text="Shelter Inventory Management" />
+            <Region HBox.hgrow="ALWAYS" />
+            <Label fx:id="lowStockBadge" styleClass="alert-pulse-badge" text="0 Low Stock" />
+         </children>
+      </HBox>
+   </top>
+   <left>
+      <ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" maxWidth="420.0" minWidth="300.0" prefWidth="380.0" vbarPolicy="AS_NEEDED" BorderPane.alignment="CENTER">
+         <content>
+            <VBox minWidth="300.0" spacing="4.0" styleClass="form-panel panel-card">
+               <padding>
+                  <Insets bottom="40.0" left="12.0" right="12.0" top="12.0" />
+               </padding>
+               <children>
+                  <Label fx:id="errorLabel" maxWidth="1.7976931348623157E308" minHeight="18.0" styleClass="login-error" text="" wrapText="true" />
+
+                  <Label styleClass="field-label" text="Shelter" />
+                  <ComboBox fx:id="shelterCombo" maxWidth="1.7976931348623157E308" promptText="Select shelter" />
+
+                  <Label styleClass="field-label" text="Resource" />
+                  <ComboBox fx:id="resourceCombo" maxWidth="1.7976931348623157E308" promptText="Select resource" />
+
+                  <Label styleClass="field-label" text="Quantity" />
+                  <TextField fx:id="quantityField" promptText="Units in stock" />
+
+                  <Label styleClass="field-label" text="Reorder Level" />
+                  <TextField fx:id="reorderLevelField" promptText="Low-stock threshold" />
+
+                  <Label styleClass="field-label" text="Last Updated" />
+                  <TextField fx:id="lastUpdatedField" disable="true" editable="false" promptText="—" />
+
+                  <Separator prefWidth="200.0" />
+
+                  <HBox minHeight="48.0" spacing="8.0">
+                     <children>
+                        <Button fx:id="btnAdd" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleAdd" styleClass="btn-primary" text="Add" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-plus" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                        <Button fx:id="btnUpdate" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleUpdate" styleClass="btn-success" text="Update" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-edit" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                     </children>
+                  </HBox>
+                  <HBox minHeight="48.0" spacing="8.0">
+                     <children>
+                        <Button fx:id="btnDelete" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleDelete" styleClass="btn-danger" text="Delete" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-trash" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                        <Button fx:id="btnFind" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleFind" styleClass="btn-neutral" text="Find" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-search" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleClear" styleClass="btn-outline" text="Clear" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-eraser" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                     </children>
+                  </HBox>
+                  <HBox minHeight="48.0" spacing="8.0">
+                     <children>
+                        <Button fx:id="btnShowLowStockOnly" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleToggleLowStockOnly" styleClass="btn-outline" text="Show Low Stock Only" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-filter" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                     </children>
+                  </HBox>
+               </children>
+            </VBox>
+         </content>
+      </ScrollPane>
+   </left>
+   <center>
+      <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" spacing="10.0" styleClass="content-area panel-card" BorderPane.alignment="CENTER">
+         <padding>
+            <Insets bottom="24.0" left="16.0" right="16.0" top="16.0" />
+         </padding>
+         <children>
+            <TableView fx:id="inventoryTable" minHeight="200.0" minWidth="400.0" VBox.vgrow="ALWAYS">
+               <columns>
+                  <TableColumn fx:id="colShelter" minWidth="140.0" prefWidth="200.0" text="Shelter" />
+                  <TableColumn fx:id="colResource" minWidth="140.0" prefWidth="220.0" text="Resource" />
+                  <TableColumn fx:id="colQuantity" minWidth="80.0" prefWidth="100.0" text="Quantity" />
+                  <TableColumn fx:id="colReorderLevel" minWidth="90.0" prefWidth="110.0" text="Reorder Level" />
+                  <TableColumn fx:id="colLastUpdated" minWidth="120.0" prefWidth="150.0" text="Last Updated" />
+                  <TableColumn fx:id="colStockStatus" minWidth="90.0" prefWidth="120.0" text="Stock Status" />
+               </columns>
+            </TableView>
+         </children>
+      </VBox>
+   </center>
+</BorderPane>

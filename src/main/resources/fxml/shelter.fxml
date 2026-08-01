@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<BorderPane minHeight="600.0" minWidth="960.0" prefHeight="850.0" prefWidth="1150.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.groupa13.disasterrelief.controller.ShelterController">
+   <top>
+      <HBox alignment="CENTER_LEFT" minHeight="72.0" spacing="20.0" styleClass="header-bar" BorderPane.alignment="CENTER">
+         <padding>
+            <Insets bottom="12.0" left="16.0" right="16.0" top="12.0" />
+         </padding>
+         <children>
+            <Button mnemonicParsing="false" onAction="#goBack" styleClass="btn-back" text="Dashboard">
+               <graphic>
+                  <FontIcon iconLiteral="fas-arrow-left" styleClass="icon-sm" />
+               </graphic>
+            </Button>
+            <Label fx:id="pageTitleLabel" styleClass="page-title" text="Shelter Management" />
+         </children>
+      </HBox>
+   </top>
+   <left>
+      <ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" maxWidth="420.0" minWidth="300.0" prefWidth="380.0" vbarPolicy="AS_NEEDED" BorderPane.alignment="CENTER">
+         <content>
+            <VBox fx:id="formPanel" minWidth="300.0" spacing="4.0" styleClass="form-panel panel-card">
+               <padding>
+                  <Insets bottom="40.0" left="12.0" right="12.0" top="12.0" />
+               </padding>
+               <children>
+                  <Label fx:id="errorLabel" maxWidth="1.7976931348623157E308" minHeight="18.0" styleClass="login-error" text="" wrapText="true" />
+
+                  <Label styleClass="field-label" text="Shelter ID" />
+                  <TextField fx:id="shelterIdField" promptText="e.g. S2001 (leave blank to auto-generate)" />
+
+                  <Label styleClass="field-label" text="Name" />
+                  <TextField fx:id="nameField" promptText="e.g. Government School Hall, Meppadi" />
+
+                  <Label styleClass="field-label" text="Latitude" />
+                  <TextField fx:id="latitudeField" promptText="e.g. 11.6091" />
+
+                  <Label styleClass="field-label" text="Longitude" />
+                  <TextField fx:id="longitudeField" promptText="e.g. 76.0851" />
+
+                  <Label styleClass="field-label" text="Capacity" />
+                  <TextField fx:id="capacityField" promptText="Maximum occupancy" />
+
+                  <Label styleClass="field-label" text="Current Occupancy (auto-tracked)" />
+                  <TextField fx:id="currentOccupancyField" disable="true" editable="false" promptText="0" />
+
+                  <Label styleClass="field-label" text="Status" />
+                  <ComboBox fx:id="statusCombo" maxWidth="1.7976931348623157E308" prefWidth="150.0" />
+
+                  <Separator prefWidth="200.0" />
+
+                  <HBox fx:id="writeActionsRow1" minHeight="48.0" spacing="8.0">
+                     <children>
+                        <Button fx:id="btnAdd" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleAdd" styleClass="btn-primary" text="Add" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-plus" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                        <Button fx:id="btnUpdate" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleUpdate" styleClass="btn-success" text="Update" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-edit" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                     </children>
+                  </HBox>
+                  <HBox fx:id="writeActionsRow2" minHeight="48.0" spacing="8.0">
+                     <children>
+                        <Button fx:id="btnDelete" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleDelete" styleClass="btn-danger" text="Delete" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-trash" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                     </children>
+                  </HBox>
+                  <HBox minHeight="48.0" spacing="8.0">
+                     <children>
+                        <Button fx:id="btnFind" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleFind" styleClass="btn-neutral" text="Find" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-search" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleClear" styleClass="btn-outline" text="Clear" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-eraser" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                     </children>
+                  </HBox>
+               </children>
+            </VBox>
+         </content>
+      </ScrollPane>
+   </left>
+   <center>
+      <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" spacing="10.0" styleClass="content-area panel-card" BorderPane.alignment="CENTER">
+         <padding>
+            <Insets bottom="24.0" left="16.0" right="16.0" top="16.0" />
+         </padding>
+         <children>
+            <TableView fx:id="shelterTable" minHeight="200.0" minWidth="400.0" VBox.vgrow="ALWAYS">
+               <columns>
+                  <TableColumn fx:id="colShelterId" minWidth="70.0" prefWidth="90.0" text="Shelter ID" />
+                  <TableColumn fx:id="colName" minWidth="140.0" prefWidth="220.0" text="Name" />
+                  <TableColumn fx:id="colCoordinates" minWidth="120.0" prefWidth="150.0" text="Coordinates" />
+                  <TableColumn fx:id="colCapacity" minWidth="70.0" prefWidth="80.0" text="Capacity" />
+                  <TableColumn fx:id="colOccupancy" minWidth="70.0" prefWidth="80.0" text="Occupancy" />
+                  <TableColumn fx:id="colOccupancyBar" minWidth="120.0" prefWidth="160.0" text="Occupancy %" />
+                  <TableColumn fx:id="colStatus" minWidth="90.0" prefWidth="110.0" text="Status" />
+               </columns>
+            </TableView>
+         </children>
+      </VBox>
+   </center>
+</BorderPane>
