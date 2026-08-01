@@ -1,0 +1,59 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.groupa13'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+// ── Local JavaFX JARs from Gradle cache (no network download required) ────────
+def gradleCache = "${System.getProperty('user.home')}/.gradle/caches/modules-2/files-2.1"
+
+def jfxBase    = fileTree("$gradleCache/org.openjfx/javafx-base/21")   { include '**/*linux*.jar' }
+def jfxCtrl    = fileTree("$gradleCache/org.openjfx/javafx-controls/21"){ include '**/*linux*.jar' }
+def jfxFxml    = fileTree("$gradleCache/org.openjfx/javafx-fxml/21")   { include '**/*linux*.jar' }
+def jfxGraph   = fileTree("$gradleCache/org.openjfx/javafx-graphics/21"){ include '**/*linux*.jar' }
+
+// ── Ikonli from Gradle cache ──────────────────────────────────────────────────
+def ikonliCore    = fileTree("$gradleCache/org.kordamp.ikonli/ikonli-core/12.3.1")         { include '**/*.jar' }
+def ikonliJfx     = fileTree("$gradleCache/org.kordamp.ikonli/ikonli-javafx/12.3.1")       { include '**/*.jar' }
+def ikonliFa5pack = fileTree("$gradleCache/org.kordamp.ikonli/ikonli-fontawesome5-pack/12.3.1"){ include '**/*.jar' }
+
+dependencies {
+    implementation jfxBase
+    implementation jfxCtrl
+    implementation jfxFxml
+    implementation jfxGraph
+    implementation ikonliCore
+    implementation ikonliJfx
+    implementation ikonliFa5pack
+}
+
+application {
+    mainClass = 'com.groupa13.disasterrelief.Main'
+
+    // Pass JavaFX modules via --module-path and --add-modules at runtime
+    applicationDefaultJvmArgs = [
+        "--module-path", [jfxBase, jfxCtrl, jfxFxml, jfxGraph].collect { fc ->
+            fc.files.collect { it.absolutePath }.join(File.pathSeparator)
+        }.join(File.pathSeparator),
+        "--add-modules", "javafx.controls,javafx.fxml"
+    ]
+}
+
+// ── Source sets ───────────────────────────────────────────────────────────────
+sourceSets {
+    main {
+        java   { srcDirs = ['src/main/java'] }
+        resources { srcDirs = ['src/main/resources'] }
+    }
+}

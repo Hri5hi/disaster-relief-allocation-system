@@ -1,7 +1,7 @@
 package com.groupa13.disasterrelief.controller;
 
+import com.groupa13.disasterrelief.util.UserRole;
 import com.groupa13.disasterrelief.util.UserSession;
-import com.groupa13.disasterrelief.util.UserSession.UserRole;
 import com.groupa13.disasterrelief.util.Utility;
 
 import javafx.concurrent.Task;

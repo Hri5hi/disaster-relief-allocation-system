@@ -3,8 +3,6 @@ package com.groupa13.disasterrelief.util;
 import java.io.IOException;
 import java.util.Arrays;
 
-import com.groupa13.disasterrelief.util.UserSession.UserRole;
-
 import javafx.event.Event;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
@@ -17,14 +15,12 @@ import javafx.stage.Stage;
 /**
  * Base utility class that all controllers extend.
  *
- * <p>
- * Provides a centralized, RBAC-guarded scene-change mechanism (§5 of
- * UI_IMPLEMENTATION_PLAN.md). Every navigation action goes through
+ * <p>Provides a centralized, RBAC-guarded scene-change mechanism (§5 of
+ * UI_IMPLEMENTATION_PLAN.md).  Every navigation action goes through
  * {@link #changeScene(Event, String, String, UserRole...)} so authorization
  * is enforced at the point of navigation, not just by hiding buttons.
  *
- * <p>
- * CSS from {@code /css/application.css} is applied automatically on every
+ * <p>CSS from {@code /css/application.css} is applied automatically on every
  * scene transition, so individual screens do not need to load the stylesheet
  * themselves.
  *
@@ -35,8 +31,7 @@ public class Utility {
     /**
      * Navigate to a new FXML scene with optional RBAC enforcement.
      *
-     * <p>
-     * If {@code allowedRoles} is non-empty and the current session role is
+     * <p>If {@code allowedRoles} is non-empty and the current session role is
      * not in that list, an "Access Denied" alert is shown and navigation is
      * aborted — the user stays on the current screen.
      *
@@ -48,7 +43,7 @@ public class Utility {
      *                     pass none (varargs empty) to allow all roles
      */
     public void changeScene(Event event, String fxmlName, String title,
-            UserRole... allowedRoles) {
+                            UserRole... allowedRoles) {
 
         // ── RBAC Guard ─────────────────────────────────────────────────────
         if (allowedRoles.length > 0) {
@@ -56,7 +51,7 @@ public class Utility {
             if (!Arrays.asList(allowedRoles).contains(currentRole)) {
                 showErrorAlert("Access Denied",
                         "Your role (" + (currentRole == null ? "none" : currentRole.getDisplayName())
-                                + ") does not have permission to access this screen.");
+                        + ") does not have permission to access this screen.");
                 return;
             }
         }

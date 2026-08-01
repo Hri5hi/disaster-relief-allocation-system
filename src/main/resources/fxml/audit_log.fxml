@@ -22,7 +22,7 @@
      Layout: Adapted from Hostel-Management-System allocation.fxml pattern
              with additional bottom pane for JSON diff display -->
 <BorderPane minHeight="600.0" minWidth="900.0" prefHeight="900.0" prefWidth="1300.0"
-            xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1"
+            xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.groupa13.disasterrelief.controller.AuditLogController">
    <top>
       <HBox alignment="CENTER_LEFT" minHeight="72.0" spacing="20.0" styleClass="header-bar" BorderPane.alignment="CENTER">

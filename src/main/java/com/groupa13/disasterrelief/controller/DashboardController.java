@@ -5,8 +5,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.groupa13.disasterrelief.util.UserRole;
 import com.groupa13.disasterrelief.util.UserSession;
-import com.groupa13.disasterrelief.util.UserSession.UserRole;
 import com.groupa13.disasterrelief.util.Utility;
 
 import javafx.concurrent.Task;
