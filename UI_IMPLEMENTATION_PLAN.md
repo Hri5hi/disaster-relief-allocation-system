@@ -1,363 +1,227 @@
 # UI Implementation Plan — Disaster Relief Allocation System
 
-> **Source of truth:** `project_description_v2.md`
-> **UI Reference:** Hostel-Management-System (layout patterns, CSS, component structure)
-> **Scope:** FXML screens, controllers, CSS, components, navigation — UI only.
+> **Source of truth:** `project_description_v2.md`  
+> **UI Reference:** Hostel-Management-System (layout patterns, CSS, component structure)  
+> **Key Architecture Upgrade:** Role-Based Access Control (RBAC) & Tailored Dashboards for 5 Target User Roles  
+> **Scope:** FXML screens, controllers, CSS, components, navigation, role-based visibility — UI layer.
 
 ---
 
-## 1. Existing Hostel UI Analysis
+## 1. Role-Based Access Control (RBAC) & 5 Target User Dashboards
 
-### 1.1 Hostel Project File Inventory
+Per Section 4 of `project_description_v2.md`, the system supports **5 distinct user roles**. Rather than showing a static dashboard with identical buttons for everyone, the UI dynamically adapts stats, navigation cards, and feature access based on the logged-in user's role.
 
-| File | Type | Purpose |
-|------|------|---------|
-| `login.fxml` | FXML | StackPane centered login card with warden ID + password fields |
-| `dashboard.fxml` | FXML | BorderPane with header, 4 stat cards (GridPane), 3 nav buttons |
-| `student.fxml` | FXML | BorderPane: left form panel (ScrollPane) + center TableView (8 cols) |
-| `room.fxml` | FXML | BorderPane: left form panel + center TableView (6 cols) |
-| `allocation.fxml` | FXML | BorderPane: left form panel + center TableView (7 cols) |
-| `application.css` | CSS | 827-line dark theme — 13 sections covering all UI elements |
-| `LoginController.java` | Controller | Async login via Task, navigates to dashboard |
-| `DashboardController.java` | Controller | Loads 4 stats async, 3 navigation methods |
-| `StudentController.java` | Controller | Full CRUD: add/update/delete/find/clear + TableView binding |
-| `RoomController.java` | Controller | CRUD + showAvailable filter + TableView binding |
-| `AllocationController.java` | Controller | CRUD + findByRoom/findByHostel filters + ComboBox for rooms |
-| `Utility.java` | Base class | `changeScene()` method — loads FXML, applies CSS, sets stage |
-| `Main.java` | Entry point | Launches login.fxml, sets min 900x650 |
+### 1.1 User Role Matrix & Screen Access
 
-### 1.2 Common UI Patterns Identified
-
-1. **Layout Pattern:** `BorderPane` with `header-bar` (top), form panel (left), TableView (center)
-2. **Navigation:** `Utility.changeScene()` — full scene replacement, back button to dashboard
-3. **Forms:** `VBox` with `field-label` + `TextField`/`ComboBox` pairs, action buttons in `HBox` rows
-4. **Tables:** `TableView` with `PropertyValueFactory` bindings, dual lists (`dataList` + `searchList`)
-5. **Async Loading:** `javafx.concurrent.Task` for all DB operations, daemon threads
-6. **Icons:** Ikonli FontAwesome5 (`FontIcon`) on every button
-7. **Error Display:** `errorLabel` with `login-error` style class in every form
-8. **CSS:** Single `application.css` loaded on every scene via `Utility.changeScene()`
+| Role | Primary Responsibility | Visible Dashboard Stats | Accessible Screens | Access Level |
+|---|---|---|---|---|
+| **1. System Administrator** (`SYSTEM_ADMIN`) | System configuration, disaster setup, overall supervision | Active Disasters, Total Shelters, Pending Requests, Active Volunteers, Audit Events | **ALL 13 Screens** (Full Unrestricted Access) | Unrestricted |
+| **2. Zone Coordinator** (`ZONE_COORDINATOR`) | Zone-specific operations, requesting supplies, registering displaced people | Assigned Zone Severity, Zone Shelter Occupancy %, Pending Zone Requests, Affected Persons in Zone | `dashboard.fxml`, `resource_request.fxml`, `affected_person.fxml`, `shelter.fxml` (read-only), `analytics.fxml` (zone deficit tab) | Restricted to assigned zone via Row-Level Security (RLS) |
+| **3. Warehouse / Inventory Manager** (`WAREHOUSE_MANAGER`) | Stock tracking, processing donations, fulfilling transfers | Low-Stock Alerts (`LISTEN/NOTIFY`), Pending Fulfillments, Total Items in Stock, Recent Donations | `dashboard.fxml`, `inventory.fxml`, `resource_request.fxml` (fulfillment mode), `donation.fxml`, `distribution_log.fxml` | Access to inventory, requests, donations & logs |
+| **4. Volunteer Coordinator** (`VOLUNTEER_COORDINATOR`) | Volunteer registration, skill matching, shift scheduling | Total Volunteers, Shifts Scheduled Today, Unassigned Volunteers, Skill Types Count | `dashboard.fxml`, `volunteer.fxml`, `volunteer_shift.fxml` | Access to volunteers & shifts |
+| **5. Reporting / Analytics User** (`ANALYTICS_USER`) | Executive decision-making, trend analysis, deficit tracking | Overall Deficit Severity, Critical Zone Count, 7-Day Supply Consumption Rate, Shelter Utilization % | `dashboard.fxml`, `analytics.fxml` (full suite), `distribution_log.fxml` (read-only), `shelter.fxml` (occupancy view) | Read-only access to views & materialized views |
 
 ---
 
-## 2. Complete Screen Mapping
+## 2. Dynamic Role-Based Dashboard Architecture
 
-| # | Hostel Screen | Disaster Relief Screen | Action |
-|---|--------------|----------------------|--------|
-| 1 | `login.fxml` | `login.fxml` | **Modify** — change title, field labels (wardenId to userId) |
-| 2 | `dashboard.fxml` | `dashboard.fxml` | **Redesign** — 6 stat cards, 8+ nav buttons for all modules |
-| 3 | `student.fxml` | `volunteer.fxml` | **Modify** — change fields: add skills, availability, zone |
-| 4 | `room.fxml` | `shelter.fxml` | **Modify** — change fields: add capacity, occupancy, coordinates, status |
-| 5 | `allocation.fxml` | `resource_request.fxml` | **Redesign** — urgency, priority_score, resource type, zone |
-| 6 | new | `disaster.fxml` | **New** — disaster CRUD with type, severity, daterange, status lifecycle |
-| 7 | new | `zone.fxml` | **New** — zone CRUD linked to disasters and shelters |
-| 8 | new | `resource.fxml` | **New** — resource + category management (hierarchical) |
-| 9 | new | `inventory.fxml` | **New** — shelter_inventory view with reorder levels, low-stock alerts |
-| 10 | new | `donation.fxml` | **New** — donation recording with JSONB items, donor info |
-| 11 | new | `affected_person.fxml` | **New** — displaced person registration with medical needs (JSONB) |
-| 12 | new | `distribution_log.fxml` | **New** — read-only log of all resource transfers |
-| 13 | new | `volunteer_shift.fxml` | **New** — shift scheduling with tsrange, zone assignment |
-| 14 | new | `audit_log.fxml` | **New** — read-only audit trail viewer |
-| 15 | new | `analytics.fxml` | **New** — charts/reports: deficit reports, consumption trends |
+### 2.1 Session Management (`UserSession.java`)
+A singleton session manager holds the active session context upon login:
+```java
+public class UserSession {
+    private String userId;
+    private String userName;
+    private UserRole role; // ENUM: SYSTEM_ADMIN, ZONE_COORDINATOR, WAREHOUSE_MANAGER, VOLUNTEER_COORDINATOR, ANALYTICS_USER
+    private Integer assignedZoneId; // Non-null for ZONE_COORDINATOR
+    
+    // Singleton instance, getters, setters, clear()
+}
+```
 
----
-
-## 3. Component Mapping
-
-| Hostel Component | Disaster Component | Changes |
-|-----------------|-------------------|---------|
-| Login card (`login-card` VBox) | Login card | Change title to "Disaster Relief Allocation System", field: userId |
-| Stat card (`stat-card` VBox) | Stat card | Reuse pattern. New stats: Active Disasters, Total Shelters, Pending Requests, Volunteers, Affected Persons, Low-Stock Alerts |
-| Nav button (`btn-nav`) | Nav button | Add more buttons: 8-10 modules instead of 3 |
-| Form panel (`form-panel`) | Form panel | Reuse layout. Change fields per screen |
-| TableView + columns | TableView + columns | Reuse pattern. Change columns per entity |
-| Header bar (`header-bar`) | Header bar | Reuse as-is |
-| Back button (`btn-back`) | Back button | Reuse unchanged |
-| Error label (`login-error`) | Error/status label | Reuse unchanged |
-| Action buttons (Add/Update/Delete/Find/Clear) | Action buttons | Reuse pattern with domain-specific labels |
-| Status bar (`status-bar`) | Status bar | Reuse. Add notification area for LISTEN/NOTIFY alerts |
+### 2.2 Dashboard Adaptation Mechanism (`DashboardController.java`)
+Upon loading `dashboard.fxml`:
+1. `DashboardController` reads `UserSession.getInstance()`.
+2. Sets top header badge: `"Logged in as: [UserName] ([Role])"`.
+3. Loads **6 Role-Tailored Stat Cards** relevant to that role's priorities.
+4. Filters the **Navigation Grid**: Only renders navigation cards/buttons the user is authorized to access (using `Node.setVisible(false)` and `Node.setManaged(false)` or dynamically populating a `FlowPane`).
 
 ---
 
-## 4. Controller Mapping
+## 3. Detailed Screen Breakdown per Target User
 
-| Hostel Controller | Disaster Controller | Reusable Logic | Modifications |
-|------------------|--------------------|-|-|
-| `LoginController` | `LoginController` | Async login Task, error handling, scene change | Change field refs, service call |
-| `DashboardController` | `DashboardController` | Async stats loading, nav methods | 6 stats instead of 4, 8+ nav methods |
-| `StudentController` | `VolunteerController` | CRUD pattern, TableView binding, dual-list search, clear | Different fields: skills, availability, zone |
-| `RoomController` | `ShelterController` | CRUD + filter pattern, TableView binding | Fields: capacity, occupancy, coordinates, status |
-| `AllocationController` | `ResourceRequestController` | CRUD + ComboBox filter pattern | Fields: zone, resource, urgency, priority_score |
-| `Utility` | `Utility` | `changeScene()` fully reusable | Change package, service reference |
-| `Main` | `Main` | App launch pattern | Change title, package |
-| new | `DisasterController` | Use StudentController CRUD pattern | Type, severity, daterange, status lifecycle |
-| new | `ZoneController` | Use RoomController CRUD pattern | Disaster dropdown, shelter dropdown |
-| new | `ResourceController` | Use StudentController CRUD pattern | Category hierarchy, unit field |
-| new | `InventoryController` | Use AllocationController pattern | Shelter + resource ComboBoxes |
-| new | `DonationController` | Use StudentController CRUD pattern | Donor name, items, receiving shelter |
-| new | `AffectedPersonController` | Use StudentController CRUD pattern | Shelter dropdown, medical needs |
-| new | `DistributionLogController` | Read-only TableView, no form | Date filter only |
-| new | `VolunteerShiftController` | Use AllocationController pattern | Volunteer + zone ComboBoxes, duty period |
-| new | `AuditLogController` | Read-only TableView with filters | Table, operation, date filters |
-| new | `AnalyticsController` | New — JavaFX Charts | BarChart, PieChart, LineChart |
+### 3.1 System Administrator Dashboard (`SYSTEM_ADMIN`)
+* **Dashboard Header:** "System Administration & Overview"
+* **Stat Widgets:** Active Disasters | Total Shelters | Total Pending Requests | Total Volunteers | Total Donations | System Audit Events
+* **Navigation Cards:**
+  - 🚨 Disaster Management (`disaster.fxml`)
+  - 🗺️ Zone Management (`zone.fxml`)
+  - 🏫 Shelter Management (`shelter.fxml`)
+  - 📦 Resource Master & Categories (`resource.fxml`)
+  - 📊 Inventory Overview (`inventory.fxml`)
+  - 📋 Resource Requests (`resource_request.fxml`)
+  - 🚚 Distribution Log (`distribution_log.fxml`)
+  - 🤝 Volunteer Directory (`volunteer.fxml`)
+  - 📅 Volunteer Shifts (`volunteer_shift.fxml`)
+  - 🏠 Affected Persons (`affected_person.fxml`)
+  - 🎁 Donation Intake (`donation.fxml`)
+  - 📈 Analytics & Reports (`analytics.fxml`)
+  - 📜 Audit Log Viewer (`audit_log.fxml`)
+
+### 3.2 Zone Coordinator Dashboard (`ZONE_COORDINATOR`)
+* **Dashboard Header:** "Zone Operations — [Zone Name]"
+* **Stat Widgets:** Zone Severity Level | Assigned Shelters | Pending Zone Requests | Affected Persons Registered
+* **Navigation Cards:**
+  - 📋 Submit & Track Resource Requests (`resource_request.fxml` — pre-filtered to current zone)
+  - 🏠 Register Displaced Persons (`affected_person.fxml` — pre-filtered to zone shelters with JSONB medical needs)
+  - 🏫 View Zone Shelters (`shelter.fxml` — read-only zone capacity)
+  - 📊 Zone Deficit Status (`analytics.fxml` — zone deficit breakdown tab)
+
+### 3.3 Warehouse / Inventory Manager Dashboard (`WAREHOUSE_MANAGER`)
+* **Dashboard Header:** "Inventory & Fulfillment Center"
+* **Stat Widgets:** Low-Stock Alerts (`LISTEN/NOTIFY` badge) | Pending Fulfillments | Total Stock Units | Donations Received Today
+* **Navigation Cards:**
+  - 📊 Shelter Inventory Management (`inventory.fxml` — edit stock, set reorder levels)
+  - ⚡ Fulfill Resource Requests (`resource_request.fxml` — triggers `fn_allocate_resources()` atomic transfer)
+  - 🎁 Record Incoming Donations (`donation.fxml` — donor info + JSONB item payloads with UPSERT)
+  - 🚚 Resource Transfer Log (`distribution_log.fxml` — read-only log of stock transfers)
+
+### 3.4 Volunteer Coordinator Dashboard (`VOLUNTEER_COORDINATOR`)
+* **Dashboard Header:** "Volunteer Management & Deployment"
+* **Stat Widgets:** Total Volunteers Registered | Active Shifts Today | Available Unassigned Volunteers | Skills Covered
+* **Navigation Cards:**
+  - 🤝 Volunteer Directory (`volunteer.fxml` — search by `TEXT[]` skills array like `{'first_aid', 'driving'}`)
+  - 📅 Shift Scheduling (`volunteer_shift.fxml` — conflict-free shift assignment with `tsrange` exclusion constraints)
+  - 🔍 Volunteer Availability View (`volunteer.fxml` — availability search tab)
+
+### 3.5 Reporting / Analytics User Dashboard (`ANALYTICS_USER`)
+* **Dashboard Header:** "Executive Analytics & Decision Support"
+* **Stat Widgets:** Critical Zone Count | Total Resource Deficit | 7-Day Supply Consumption Rate | Shelter Occupancy Rate
+* **Navigation Cards:**
+  - 📈 Analytics Suite (`analytics.fxml` — Bar/Line/Pie charts, 7-day moving averages, category roll-ups)
+  - 🏫 Shelter Occupancy Dashboard (`v_shelter_dashboard` view)
+  - 🗺️ Zone Deficit Summary (`fn_zone_deficit_report()` output)
+  - 🚚 Distribution Analytics (`mv_daily_distribution_stats` materialized view)
 
 ---
 
-## 5. CSS Reuse
+## 4. Complete Screen Inventory (14 FXML Screens)
 
-### 5.1 Fully Reusable (No Changes Needed)
+| # | Screen FXML | Purpose | Primary Target Roles | Key Controls & Layout |
+|---|------------|---------|----------------------|----------------------|
+| 1 | `login.fxml` | User authentication & role selection | All Roles | StackPane card, User ID, Password, Role selector |
+| 2 | `dashboard.fxml` | Dynamic role-adapted dashboard | All Roles (Custom View) | Header bar, 4-6 Stat Cards, Dynamic Nav FlowPane |
+| 3 | `disaster.fxml` | Disaster lifecycle & active periods | Admin | TableView, daterange picker, status ComboBox |
+| 4 | `zone.fxml` | Zone creation & primary shelter assignment | Admin | TableView, disaster dropdown, shelter dropdown |
+| 5 | `shelter.fxml` | Shelter capacity, occupancy & location | Admin, Zone Coord, Analytics | TableView, occupancy bar, coordinate fields |
+| 6 | `resource.fxml` | Resource catalog & hierarchical categories | Admin, Warehouse Mgr | Category TreeView, resource TableView, unit input |
+| 7 | `inventory.fxml` | Shelter inventory & reorder levels | Warehouse Mgr, Admin | TableView with low-stock highlight, reorder level editor |
+| 8 | `resource_request.fxml` | Priority request submission & fulfillment | Zone Coord, Warehouse Mgr, Admin | Priority score column, urgency tags, Fulfill button |
+| 9 | `volunteer.fxml` | Volunteer directory & skill matching | Volunteer Coord, Admin | TableView, skill tags (`TEXT[]`), availability search |
+| 10 | `volunteer_shift.fxml` | Conflict-free shift scheduling | Volunteer Coord, Admin | Date/time pickers (`tsrange`), zone dropdown |
+| 11 | `affected_person.fxml` | Displaced person registration | Zone Coord, Admin | Form panel, medical needs JSON text area |
+| 12 | `donation.fxml` | Donation intake & stock integration | Warehouse Mgr, Admin | Donor info, item table builder (JSONB), receive button |
+| 13 | `distribution_log.fxml` | Read-only resource movement history | Warehouse Mgr, Admin, Analytics | Partitioned date range filter, transfer TableView |
+| 14 | `audit_log.fxml` | System mutation audit trail | Admin | Table, operation, user & date filters, JSON diff viewer |
+| 15 | `analytics.fxml` | Executive reports & chart dashboards | Analytics User, Admin, Zone Coord | JavaFX BarChart, LineChart, PieChart, Deficit table |
 
-All 13 sections of the Hostel `application.css` (827 lines) can be copied as-is:
-- Root and Globals (dark gradient background, font family)
-- Typography (page-title, section-title, stat-number, stat-label)
-- Panels and Cards (header-bar, card, form-panel, panel-card, status-bar)
-- Text Fields and Inputs (dark theme fields with blue focus borders)
-- Combo Box and Spinner styles
-- Buttons (btn-primary, btn-success, btn-danger, btn-neutral, btn-outline, btn-nav)
-- Table View (dark rows, blue headers, hover/selected states)
-- Scroll Bars (minimal dark theme)
-- Login Scene (login-root, login-card, btn-login)
-- Dashboard (stat-card variants)
-- Status Indicators (active, inactive, pending)
-- Tooltips and Alerts (dialog-pane)
-- Form Layout Helpers (field-label, button-row)
+---
 
-### 5.2 New Classes to Add
+## 5. Screen Security & Navigation Guards
+
+To prevent unauthorized manual scene changes or button bypassing:
+
+```java
+public class Utility {
+    
+    public static void changeScene(Event event, String fxmlPath, String title, UserRole... allowedRoles) {
+        UserRole currentRole = UserSession.getInstance().getRole();
+        
+        // Authorization Guard
+        if (allowedRoles.length > 0 && !Arrays.asList(allowedRoles).contains(currentRole)) {
+            showErrorAlert("Access Denied", "Your role (" + currentRole + ") does not have permission to access this screen.");
+            return;
+        }
+        
+        // Load FXML and apply CSS
+        // ...
+    }
+}
+```
+
+---
+
+## 6. CSS Extensions for Role UI & Status Badges
+
+Add the following to section 14 of `application.css`:
 
 ```css
-/* 14. DISASTER RELIEF EXTENSIONS */
-.stat-card-red    { -fx-border-color: #ef4444 #334155 #334155 #334155; -fx-border-width: 3 1 1 1; }
-.stat-card-teal   { -fx-border-color: #14b8a6 #334155 #334155 #334155; -fx-border-width: 3 1 1 1; }
-.stat-card-amber  { -fx-border-color: #f59e0b #334155 #334155 #334155; -fx-border-width: 3 1 1 1; }
-.status-critical  { -fx-text-fill: #ef4444; -fx-font-weight: bold; }
-.status-high      { -fx-text-fill: #f97316; -fx-font-weight: bold; }
-.status-medium    { -fx-text-fill: #eab308; -fx-font-weight: bold; }
-.status-low       { -fx-text-fill: #22c55e; -fx-font-weight: bold; }
-.status-operational { -fx-text-fill: #22c55e; }
-.status-full      { -fx-text-fill: #ef4444; }
-.status-closed    { -fx-text-fill: #6b7280; }
-.status-resolved  { -fx-text-fill: #3b82f6; }
-.status-monitoring { -fx-text-fill: #f59e0b; }
-.btn-nav-red      { /* same as btn-nav but #ef4444 background */ }
-.btn-nav-teal     { /* same as btn-nav but #14b8a6 background */ }
-.btn-nav-amber    { /* same as btn-nav but #f59e0b background */ }
-.badge            { /* small count badge for alerts */ }
-.chart-container  { /* wrapper for JavaFX charts */ }
-.json-field       { /* styled TextArea for JSONB input */ }
-.priority-bar     { /* visual priority score indicator */ }
+/* ==========================================================================
+   14. ROLE-BASED DASHBOARD & STATUS EXTENSIONS
+   ========================================================================== */
+
+/* Role Badges */
+.role-badge-admin       { -fx-background-color: rgba(239, 68, 68, 0.15); -fx-text-fill: #ef4444; -fx-border-color: #ef4444; -fx-border-radius: 3; -fx-padding: 3 8; }
+.role-badge-zone        { -fx-background-color: rgba(245, 158, 11, 0.15); -fx-text-fill: #f59e0b; -fx-border-color: #f59e0b; -fx-border-radius: 3; -fx-padding: 3 8; }
+.role-badge-warehouse   { -fx-background-color: rgba(20, 184, 166, 0.15); -fx-text-fill: #14b8a6; -fx-border-color: #14b8a6; -fx-border-radius: 3; -fx-padding: 3 8; }
+.role-badge-volunteer   { -fx-background-color: rgba(59, 130, 246, 0.15); -fx-text-fill: #3b82f6; -fx-border-color: #3b82f6; -fx-border-radius: 3; -fx-padding: 3 8; }
+.role-badge-analytics   { -fx-background-color: rgba(168, 85, 247, 0.15); -fx-text-fill: #a855f7; -fx-border-color: #a855f7; -fx-border-radius: 3; -fx-padding: 3 8; }
+
+/* Urgency Status Colors */
+.status-critical   { -fx-text-fill: #ef4444; -fx-font-weight: bold; }
+.status-high       { -fx-text-fill: #f97316; -fx-font-weight: bold; }
+.status-medium     { -fx-text-fill: #eab308; -fx-font-weight: bold; }
+.status-low        { -fx-text-fill: #22c55e; -fx-font-weight: bold; }
+
+/* Low-Stock Alert Highlight */
+.row-low-stock     { -fx-background-color: rgba(239, 68, 68, 0.1); }
+.alert-pulse-badge { -fx-background-color: #ef4444; -fx-text-fill: white; -fx-background-radius: 10; -fx-padding: 2 6; }
 ```
 
-### 5.3 Strategy
-- Copy `application.css` to disaster project as-is
-- Append new classes in section 14
-- **One developer (Dev A) owns CSS exclusively**
+---
+
+## 7. Revised Developer Work Split
+
+### Developer A — Foundation, Infrastructure & Core Asset Modules
+* **Shared Infrastructure:** `Main.java`, `Utility.java` (with RBAC security guards), `UserSession.java`, `application.css`, `login.fxml` + `LoginController.java`, `dashboard.fxml` + `DashboardController.java` (dynamic role layout engine).
+* **Target Screens (8 Screens):**
+  1. `disaster.fxml` (`DisasterController.java`) — Admin
+  2. `zone.fxml` (`ZoneController.java`) — Admin
+  3. `shelter.fxml` (`ShelterController.java`) — Admin, Zone Coord, Analytics
+  4. `resource.fxml` (`ResourceController.java`) — Admin, Warehouse Mgr
+  5. `inventory.fxml` (`InventoryController.java`) — Warehouse Mgr, Admin
+  6. `donation.fxml` (`DonationController.java`) — Warehouse Mgr, Admin
+  7. `analytics.fxml` (`AnalyticsController.java`) — Analytics User, Admin, Zone Coord
+
+### Developer B — People, Operations & Logging Modules
+* **Target Screens (7 Screens):**
+  1. `volunteer.fxml` (`VolunteerController.java`) — Volunteer Coord, Admin
+  2. `volunteer_shift.fxml` (`VolunteerShiftController.java`) — Volunteer Coord, Admin
+  3. `affected_person.fxml` (`AffectedPersonController.java`) — Zone Coord, Admin
+  4. `resource_request.fxml` (`ResourceRequestController.java`) — Zone Coord, Warehouse Mgr, Admin
+  5. `distribution_log.fxml` (`DistributionLogController.java`) — Warehouse Mgr, Admin, Analytics
+  6. `audit_log.fxml` (`AuditLogController.java`) — Admin
 
 ---
 
-## 6. Missing Screens (Required by V2 Spec)
+## 8. Implementation Order & Checklist
 
-| Screen | V2 Section | Content |
-|--------|-----------|---------|
-| `disaster.fxml` | 5.1 | CRUD: name, type, severity, active_period (dates), status lifecycle |
-| `zone.fxml` | 5.1 | CRUD: name, severity, primary_shelter (ComboBox), coordinator_contact |
-| `resource.fxml` | 5.5 | CRUD: name, category (hierarchical), unit. Category tree section |
-| `inventory.fxml` | 5.5 | Shelter + resource ComboBoxes, quantity, reorder_level. Low-stock highlight |
-| `donation.fxml` | 5.5 | donor_name, items (resource+qty pairs), receiving_shelter |
-| `affected_person.fxml` | 5.6 | name, contact, email, shelter, medical_needs (JSON text area) |
-| `distribution_log.fxml` | 5.3 | Read-only: source, dest, resource, quantity, timestamp. Date filter |
-| `volunteer_shift.fxml` | 5.4 | volunteer + zone ComboBoxes, duty_period start/end |
-| `audit_log.fxml` | 5.8 | Read-only: table, operation, old/new values, user, timestamp |
-| `analytics.fxml` | 5.7 | Charts: zone deficit, shelter occupancy, resource consumption trends |
+### Phase 1 — Authentication & Dynamic Dashboard Engine (Days 1-2)
+- [ ] Implement `UserSession.java` singleton & `UserRole` enum.
+- [ ] Enhance `LoginController.java` with role selection & authentication token parsing.
+- [ ] Build dynamic role layout engine in `DashboardController.java`.
+- [ ] Add RBAC authorization guards to `Utility.changeScene()`.
+- [ ] Port `application.css` and append role badge classes.
 
----
+### Phase 2 — Role-Specific Screens (Days 3-6)
+- [ ] **Zone Coordinator View:** Build `resource_request.fxml` and `affected_person.fxml` with zone context filtering.
+- [ ] **Warehouse Manager View:** Build `inventory.fxml`, fulfillment action in `resource_request.fxml`, and `donation.fxml`.
+- [ ] **Volunteer Coordinator View:** Build `volunteer.fxml` (skills matching) and `volunteer_shift.fxml` (conflict-free calendar).
+- [ ] **Analytics View:** Build `analytics.fxml` charts (deficit, occupancy, 7-day consumption).
+- [ ] **System Admin View:** Build `disaster.fxml`, `zone.fxml`, `resource.fxml`, and `audit_log.fxml`.
 
-## 7. Navigation Flow
-
-```
-Login
-  |
-Dashboard (6 stat cards + nav grid)
-  +-- Disaster Management      (disaster.fxml)
-  +-- Zone Management           (zone.fxml)
-  +-- Shelter Management        (shelter.fxml)
-  +-- Resources                 (resource.fxml)
-  +-- Inventory                 (inventory.fxml)
-  +-- Resource Requests         (resource_request.fxml)
-  +-- Distribution Log          (distribution_log.fxml)
-  +-- Volunteers                (volunteer.fxml)
-  +-- Volunteer Shifts          (volunteer_shift.fxml)
-  +-- Affected Persons          (affected_person.fxml)
-  +-- Donations                 (donation.fxml)
-  +-- Analytics                 (analytics.fxml)
-  +-- Audit Log                 (audit_log.fxml)
-```
-
-Every sub-screen has a **Back -> Dashboard** button using `Utility.changeScene()`.
-
----
-
-## 8. Developer Work Split
-
-### Principles
-- No FXML file edited by both developers
-- No controller edited by both developers
-- Only Dev A owns `application.css` and `Utility.java`
-- Both can work independently with zero merge conflicts
-
-### Developer A — Core Infrastructure + Entity Screens
-
-| Category | Files |
-|----------|-------|
-| Shared | `Main.java`, `Utility.java`, `application.css`, `login.fxml`, `LoginController`, `dashboard.fxml`, `DashboardController` |
-| Disaster | `disaster.fxml`, `DisasterController.java` |
-| Zone | `zone.fxml`, `ZoneController.java` |
-| Shelter | `shelter.fxml`, `ShelterController.java` |
-| Resource | `resource.fxml`, `ResourceController.java` |
-| Inventory | `inventory.fxml`, `InventoryController.java` |
-| Analytics | `analytics.fxml`, `AnalyticsController.java` |
-
-**Total: 8 FXML files, 8 controllers, CSS, Utility, Main**
-
-### Developer B — People, Allocation, Logging Screens
-
-| Category | Files |
-|----------|-------|
-| Volunteer | `volunteer.fxml`, `VolunteerController.java` |
-| Shifts | `volunteer_shift.fxml`, `VolunteerShiftController.java` |
-| Affected | `affected_person.fxml`, `AffectedPersonController.java` |
-| Requests | `resource_request.fxml`, `ResourceRequestController.java` |
-| Dist. Log | `distribution_log.fxml`, `DistributionLogController.java` |
-| Donations | `donation.fxml`, `DonationController.java` |
-| Audit | `audit_log.fxml`, `AuditLogController.java` |
-
-**Total: 7 FXML files, 7 controllers**
-
-### Merge Conflict Prevention
-
-| Shared Resource | Owner | Rule |
-|----------------|-------|------|
-| `application.css` | Dev A | Dev B does NOT edit |
-| `Utility.java` | Dev A | Dev B uses but does NOT modify |
-| `dashboard.fxml` | Dev A | Dev B provides nav method names; Dev A wires them |
-| `DashboardController` | Dev A | Dev A adds all nav methods |
-| Model classes | Split by entity | Each dev creates only their own models |
-
----
-
-## 9. Development Order
-
-### Phase 1 — Foundation (Dev A, Days 1-2)
-1. Project setup: build.gradle, packages, resource directories
-2. `Utility.java` adapted from hostel
-3. `application.css` copied + disaster extensions added
-4. `Main.java` entry point
-5. `login.fxml` + `LoginController.java`
-6. `dashboard.fxml` + `DashboardController.java` (placeholder stats + all nav buttons)
-
-### Phase 2 — Core CRUD Screens (Both, Days 2-5)
-
-**Dev A:** disaster, zone, shelter, resource, inventory
-
-**Dev B:** volunteer, affected_person, resource_request, donation
-
-### Phase 3 — Scheduling and Logging (Dev B, Days 5-7)
-1. `volunteer_shift.fxml` + controller
-2. `distribution_log.fxml` + controller
-3. `audit_log.fxml` + controller
-
-### Phase 4 — Analytics and Polish (Dev A, Days 5-7)
-1. `analytics.fxml` + controller with charts
-2. Dashboard stat wiring
-3. CSS polish
-
-### Phase 5 — Integration (Both, Days 7-8)
-1. Wire all navigation from dashboard
-2. Cross-screen testing
-3. Final adjustments
-
----
-
-## 10. Implementation Checklist
-
-### Foundation
-- [ ] Project skeleton (build.gradle, packages, resources)
-- [ ] `Utility.java` adapted
-- [ ] `application.css` ported + extensions
-- [ ] `Main.java` created
-- [ ] `login.fxml` + `LoginController.java`
-- [ ] `dashboard.fxml` + `DashboardController.java`
-
-### Dev A Screens
-- [ ] `disaster.fxml` + `DisasterController.java`
-- [ ] `zone.fxml` + `ZoneController.java`
-- [ ] `shelter.fxml` + `ShelterController.java`
-- [ ] `resource.fxml` + `ResourceController.java`
-- [ ] `inventory.fxml` + `InventoryController.java`
-- [ ] `analytics.fxml` + `AnalyticsController.java`
-
-### Dev B Screens
-- [ ] `volunteer.fxml` + `VolunteerController.java`
-- [ ] `affected_person.fxml` + `AffectedPersonController.java`
-- [ ] `resource_request.fxml` + `ResourceRequestController.java`
-- [ ] `volunteer_shift.fxml` + `VolunteerShiftController.java`
-- [ ] `distribution_log.fxml` + `DistributionLogController.java`
-- [ ] `donation.fxml` + `DonationController.java`
-- [ ] `audit_log.fxml` + `AuditLogController.java`
-
-### Integration
-- [ ] All nav buttons on dashboard functional
-- [ ] Back buttons on all screens return to dashboard
-- [ ] CSS consistent across all screens
-- [ ] All tables load data asynchronously
-- [ ] Error labels work on all forms
-- [ ] ComboBoxes populated correctly
-
----
-
-## Appendix: Target File Tree
-
-```
-src/main/
-  java/com/groupa13/disasterrelief/
-    controller/
-      LoginController.java          (Dev A)
-      DashboardController.java      (Dev A)
-      DisasterController.java       (Dev A)
-      ZoneController.java           (Dev A)
-      ShelterController.java        (Dev A)
-      ResourceController.java       (Dev A)
-      InventoryController.java      (Dev A)
-      AnalyticsController.java      (Dev A)
-      VolunteerController.java      (Dev B)
-      AffectedPersonController.java (Dev B)
-      ResourceRequestController.java(Dev B)
-      VolunteerShiftController.java (Dev B)
-      DistributionLogController.java(Dev B)
-      DonationController.java       (Dev B)
-      AuditLogController.java       (Dev B)
-      Utility.java                  (Dev A)
-    model/
-    dao/
-    service/
-    util/
-      Main.java                     (Dev A)
-  resources/
-    fxml/
-      login.fxml                    (Dev A)
-      dashboard.fxml                (Dev A)
-      disaster.fxml                 (Dev A)
-      zone.fxml                     (Dev A)
-      shelter.fxml                  (Dev A)
-      resource.fxml                 (Dev A)
-      inventory.fxml                (Dev A)
-      analytics.fxml                (Dev A)
-      volunteer.fxml                (Dev B)
-      affected_person.fxml          (Dev B)
-      resource_request.fxml         (Dev B)
-      volunteer_shift.fxml          (Dev B)
-      distribution_log.fxml         (Dev B)
-      donation.fxml                 (Dev B)
-      audit_log.fxml                (Dev B)
-    css/
-      application.css               (Dev A)
-    images/
-```
+### Phase 3 — Verification & Role Testing (Days 7-8)
+- [ ] Login test as `SYSTEM_ADMIN`: Verify all 13 screens accessible.
+- [ ] Login test as `ZONE_COORDINATOR`: Verify dashboard shows only Zone requests, Affected Persons, Shelter status, and Zone deficit. Attempt unauthorized navigation guard test.
+- [ ] Login test as `WAREHOUSE_MANAGER`: Verify Low-Stock alert highlights, donation intake, and fulfillment action calling `fn_allocate_resources()`.
+- [ ] Login test as `VOLUNTEER_COORDINATOR`: Verify volunteer skill array searching and shift exclusion validation.
+- [ ] Login test as `ANALYTICS_USER`: Verify read-only charts, deficit reports, and materialized view dashboard rendering.
