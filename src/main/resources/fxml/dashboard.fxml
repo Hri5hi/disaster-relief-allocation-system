@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.FlowPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Priority?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="750.0" prefWidth="1200.0" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.groupa13.disasterrelief.controller.DashboardController">
+   <top>
+      <HBox alignment="CENTER_LEFT" spacing="14.0" styleClass="header-bar" BorderPane.alignment="CENTER">
+         <children>
+            <Label fx:id="headerTitle" alignment="CENTER_LEFT" styleClass="page-title" text="Dashboard" HBox.hgrow="ALWAYS" />
+            <Region HBox.hgrow="ALWAYS" />
+            <Label fx:id="userNameLabel" styleClass="text-muted" text="" />
+            <Label fx:id="roleBadge" styleClass="role-badge-admin" text="" />
+         </children>
+      </HBox>
+   </top>
+   <bottom>
+      <HBox styleClass="status-bar" BorderPane.alignment="CENTER">
+         <children>
+            <Label fx:id="statusLabel" text="Connected to Database" />
+         </children>
+      </HBox>
+   </bottom>
+   <center>
+      <ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="AS_NEEDED" BorderPane.alignment="CENTER">
+         <content>
+            <StackPane alignment="TOP_CENTER">
+               <children>
+                  <VBox spacing="24.0" styleClass="dashboard-main">
+                     <padding>
+                        <Insets bottom="28.0" left="32.0" right="32.0" top="28.0" />
+                     </padding>
+                     <children>
+                        <Label fx:id="overviewTitle" styleClass="section-title" text="Overview" />
+                        <FlowPane fx:id="statCardsPane" hgap="16.0" vgap="16.0" />
+                        <Label styleClass="section-title" text="Quick Navigation" />
+                        <FlowPane fx:id="navCardsPane" hgap="12.0" vgap="12.0" />
+                     </children>
+                  </VBox>
+               </children>
+            </StackPane>
+         </content>
+      </ScrollPane>
+   </center>
+</BorderPane>
