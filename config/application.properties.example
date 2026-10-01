@@ -1,0 +1,7 @@
+# Copy to config/application.properties and replace the local password.
+db.jdbcUrl=jdbc:postgresql://localhost:5432/dras
+db.username=dras_app
+db.password=replace-with-local-secret
+db.pool.maximumSize=10
+db.pool.connectionTimeoutMs=10000
+flyway.locations=filesystem:database/migrations

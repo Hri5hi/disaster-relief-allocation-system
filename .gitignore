@@ -5,6 +5,7 @@ build/
 # Java
 *.class
 out/
+bin/
 
 # IntelliJ / Antigravity
 .idea/

@@ -11,6 +11,9 @@ repositories {
 }
 
 java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
 }
@@ -30,6 +33,20 @@ dependencies {
     implementation 'org.kordamp.ikonli:ikonli-core:12.3.1'
     implementation 'org.kordamp.ikonli:ikonli-javafx:12.3.1'
     implementation 'org.kordamp.ikonli:ikonli-fontawesome5-pack:12.3.1'
+
+    // PostgreSQL persistence and migration baseline
+    implementation 'org.postgresql:postgresql:42.7.13'
+    implementation 'com.zaxxer:HikariCP:7.1.0'
+    implementation 'org.flywaydb:flyway-core:13.8.0'
+    implementation 'org.flywaydb:flyway-database-postgresql:13.8.0'
+    implementation 'org.mindrot:jbcrypt:0.4'
+
+    // JUnit 5 and PostgreSQL Testcontainers
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.12.2'
+    testImplementation platform('org.testcontainers:testcontainers-bom:2.0.5')
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 application {
@@ -47,6 +64,14 @@ tasks.named('run', JavaExec) {
     }
 }
 
+tasks.named('test', Test) {
+    useJUnitPlatform()
+    testLogging {
+        events 'failed', 'skipped'
+        exceptionFormat = 'full'
+    }
+}
+
 // ── Source sets ───────────────────────────────────────────────────────────────
 sourceSets {
     main {
@@ -54,4 +79,3 @@ sourceSets {
         resources { srcDirs = ['src/main/resources'] }
     }
 }
-
