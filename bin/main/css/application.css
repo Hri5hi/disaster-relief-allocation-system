@@ -1,0 +1,958 @@
+/* =============================================================
+   APPLICATION.CSS — Single stylesheet for all scenes
+   Load this ONE file on every FXML in Scene Builder:
+     Preview > Scene Style Sheets > Add > application.css
+   ============================================================= */
+
+
+/* ─────────────────────────────────────────────────────────────
+   1. ROOT & GLOBALS
+   ───────────────────────────────────────────────────────────── */
+
+.root {
+    -fx-background-color: linear-gradient(to bottom, #0b1220, #0f172a 28%, #0b1220);
+    -fx-font-family: "Segoe UI", "Cantarell", "Noto Sans", sans-serif;
+    -fx-font-size: 13px;
+    -fx-text-fill: #cbd5e1;
+}
+
+.scroll-pane,
+.scroll-pane>.viewport,
+.split-pane,
+.anchor-pane,
+.border-pane,
+.vbox,
+.hbox,
+.grid-pane,
+.flow-pane,
+.stack-pane {
+    -fx-background-color: transparent;
+}
+
+.separator .line {
+    -fx-border-color: #2a3f5f;
+    -fx-border-width: 1 0 0 0;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   2. TYPOGRAPHY
+   ───────────────────────────────────────────────────────────── */
+
+.label {
+    -fx-text-fill: #cbd5e1;
+}
+
+/* Page titles — e.g. "Student Management" */
+.page-title {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #ffffff;
+    -fx-wrap-text: true;
+    -fx-text-alignment: center;
+    -fx-padding: 0 0 4 0;
+}
+
+/* Section headers — e.g. "Student Details" above a form */
+.section-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #ffffff;
+    -fx-padding: 4 0 10 0;
+    -fx-wrap-text: true;
+}
+
+/* Muted helper text */
+.text-muted {
+    -fx-text-fill: #7a818b;
+    -fx-font-size: 11px;
+}
+
+/* Stat numbers on dashboard */
+.stat-number {
+    -fx-font-size: 36px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #ffffff;
+    -fx-wrap-text: true;
+    -fx-line-spacing: 2px;
+    -fx-padding: 2 0 0 0;
+}
+
+.stat-label {
+    -fx-font-size: 11px;
+    -fx-text-fill: #94a3b8;
+    -fx-font-weight: bold;
+    -fx-padding: 2 0 0 0;
+    -fx-wrap-text: true;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   3. PANELS & CARDS
+   ───────────────────────────────────────────────────────────── */
+
+/* Dark header bar — use on HBox at top of each scene */
+.header-bar {
+    -fx-background-color: rgba(11, 18, 32, 0.92);
+    -fx-padding: 14 24 14 24;
+    -fx-spacing: 16;
+    -fx-alignment: center-left;
+    -fx-border-color: transparent transparent #1e293b transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.35), 10, 0.1, 0, 2);
+}
+
+/* A raised card/panel — stat cards, form panels */
+.card {
+    -fx-background-color: #1e293b;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-border-radius: 12;
+    -fx-background-radius: 12;
+    -fx-padding: 16;
+    -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.45), 14, 0.2, 0, 5);
+}
+
+/* Form panel wrapper */
+.form-panel {
+    -fx-background-color: #1e293b;
+    -fx-padding: 20;
+    -fx-spacing: 8;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-border-radius: 14;
+    -fx-background-radius: 14;
+    -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.25), 12, 0.18, 0, 4);
+}
+
+/* Content area */
+.content-area {
+    -fx-padding: 24;
+    -fx-spacing: 18;
+}
+
+.panel-card {
+    -fx-background-color: #1e293b;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-border-radius: 14;
+    -fx-background-radius: 14;
+    -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.22), 12, 0.16, 0, 3);
+}
+
+.dashboard-main {
+    -fx-max-width: 1360;
+    -fx-min-width: 1080;
+    -fx-spacing: 24;
+}
+
+/* Status bar at bottom */
+.status-bar {
+    -fx-background-color: #0b1220;
+    -fx-padding: 6 20 6 20;
+    -fx-border-color: #1e293b transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+
+.status-bar .label {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 11px;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   4. TEXT FIELDS & INPUTS
+   ───────────────────────────────────────────────────────────── */
+
+.text-field,
+.password-field,
+.text-area {
+    -fx-background-color: #273449;
+    -fx-text-fill: #e2e8f0;
+    -fx-prompt-text-fill: #94a3b8;
+    -fx-border-color: #3b4b62;
+    -fx-border-width: 0 0 2 0;
+    -fx-border-radius: 0;
+    -fx-background-radius: 3 3 0 0;
+    -fx-padding: 8 10 8 10;
+    -fx-highlight-fill: #4d8fcc;
+    -fx-highlight-text-fill: #ffffff;
+}
+
+.text-field:focused,
+.password-field:focused,
+.text-area:focused {
+    -fx-border-color: #66c0f4;
+}
+
+.text-field:disabled,
+.password-field:disabled {
+    -fx-opacity: 0.5;
+}
+
+/* Search field variant */
+.search-field {
+    -fx-background-color: #32404f;
+    -fx-text-fill: #e5e5e5;
+    -fx-prompt-text-fill: #7a818b;
+    -fx-border-color: #3d4f5f;
+    -fx-border-width: 1;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+    -fx-padding: 6 12 6 12;
+}
+
+.search-field:focused {
+    -fx-border-color: #66c0f4;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   5. COMBO BOX, CHOICE BOX, SPINNER
+   ───────────────────────────────────────────────────────────── */
+
+.combo-box,
+.choice-box {
+    -fx-background-color: #32404f;
+    -fx-border-color: #3d4f5f;
+    -fx-border-width: 1;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+}
+
+.combo-box .list-cell,
+.choice-box .label {
+    -fx-text-fill: #e5e5e5;
+    -fx-background-color: transparent;
+    -fx-padding: 4 8 4 8;
+}
+
+.combo-box .arrow-button,
+.choice-box .open-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0 6 0 6;
+}
+
+.combo-box .arrow,
+.choice-box .arrow {
+    -fx-background-color: #acb2b8;
+}
+
+.combo-box-popup .list-view {
+    -fx-background-color: #32404f;
+    -fx-border-color: #3d4f5f;
+    -fx-border-width: 1;
+    -fx-background-radius: 0;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.4), 8, 0, 0, 4);
+}
+
+.combo-box-popup .list-view .list-cell {
+    -fx-text-fill: #e5e5e5;
+    -fx-background-color: #32404f;
+    -fx-padding: 6 10 6 10;
+}
+
+.combo-box-popup .list-view .list-cell:hover,
+.combo-box-popup .list-view .list-cell:focused {
+    -fx-background-color: #1a9fff;
+    -fx-text-fill: #ffffff;
+}
+
+.spinner {
+    -fx-background-color: #32404f;
+    -fx-border-color: #3d4f5f;
+    -fx-border-width: 1;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+}
+
+.spinner .text-field {
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-background-radius: 0;
+}
+
+.spinner .increment-arrow-button,
+.spinner .decrement-arrow-button {
+    -fx-background-color: #3d4f5f;
+}
+
+.spinner .increment-arrow-button .increment-arrow,
+.spinner .decrement-arrow-button .decrement-arrow {
+    -fx-background-color: #acb2b8;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   6. BUTTONS
+   ───────────────────────────────────────────────────────────── */
+
+/* Default button */
+.button {
+    -fx-background-color: #334155;
+    -fx-text-fill: #e2e8f0;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 11 20 11 20;
+    -fx-border-radius: 12;
+    -fx-background-radius: 12;
+    -fx-cursor: hand;
+    -fx-border-color: rgba(148, 163, 184, 0.25);
+    -fx-border-width: 1;
+    -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.35), 10, 0.2, 0, 3);
+    -fx-scale-x: 1.0;
+    -fx-scale-y: 1.0;
+    -fx-content-display: LEFT;
+    -fx-graphic-text-gap: 8;
+}
+
+.button:hover {
+    -fx-background-color: #475569;
+    -fx-effect: dropshadow(gaussian, rgba(59, 130, 246, 0.28), 14, 0.25, 0, 5);
+    -fx-scale-x: 1.05;
+    -fx-scale-y: 1.05;
+}
+
+.button:pressed {
+    -fx-background-color: #2e3d4d;
+    -fx-scale-x: 0.985;
+    -fx-scale-y: 0.985;
+}
+
+.button:disabled {
+    -fx-opacity: 0.4;
+}
+
+/* ── Primary — blue (Add, Create, Login) ── */
+.btn-primary {
+    -fx-background-color: #3b82f6;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: rgba(147, 197, 253, 0.5);
+}
+
+.btn-primary:hover {
+    -fx-background-color: #60a5fa;
+}
+
+.btn-primary:pressed {
+    -fx-background-color: #2563eb;
+}
+
+/* ── Success — muted green (Update, Save, Confirm) ── */
+.btn-success {
+    -fx-background-color: #16a34a;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: rgba(134, 239, 172, 0.5);
+}
+
+.btn-success:hover {
+    -fx-background-color: #22c55e;
+}
+
+.btn-success:pressed {
+    -fx-background-color: #15803d;
+}
+
+/* ── Danger — muted red (Delete, Remove) ── */
+.btn-danger {
+    -fx-background-color: #7c3030;
+    -fx-text-fill: #ffffff;
+    -fx-border-color: rgba(252, 165, 165, 0.45);
+}
+
+.btn-danger:hover {
+    -fx-background-color: #943939;
+}
+
+.btn-danger:pressed {
+    -fx-background-color: #642626;
+}
+
+/* ── Neutral — dark gray (Find, Search, Cancel) ── */
+.btn-neutral {
+    -fx-background-color: #334155;
+    -fx-text-fill: #e2e8f0;
+    -fx-border-color: rgba(148, 163, 184, 0.35);
+}
+
+.btn-neutral:hover {
+    -fx-background-color: #475569;
+}
+
+.btn-neutral:pressed {
+    -fx-background-color: #2e3d4d;
+}
+
+/* ── Outlined — transparent with border (Clear, Reset) ── */
+.btn-outline {
+    -fx-background-color: rgba(15, 23, 42, 0.35);
+    -fx-text-fill: #acb2b8;
+    -fx-border-color: #64748b;
+    -fx-border-width: 1;
+}
+
+.btn-outline:hover {
+    -fx-text-fill: #e5e5e5;
+    -fx-border-color: #93c5fd;
+}
+
+/* ── Nav button — large dashboard navigation ── */
+.btn-nav {
+    -fx-background-color: #3b82f6;
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 14 14 14 14;
+    -fx-max-width: 10000;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-alignment: center;
+}
+
+.btn-nav:hover {
+    -fx-background-color: #60a5fa;
+}
+
+.btn-nav:pressed {
+    -fx-background-color: #2563eb;
+}
+
+/* Variant: nav green */
+.btn-nav-green {
+    -fx-background-color: #16a34a;
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 14 14 14 14;
+    -fx-max-width: 10000;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-alignment: center;
+}
+
+.btn-nav-green:hover {
+    -fx-background-color: #22c55e;
+}
+
+/* Variant: nav gray */
+.btn-nav-gray {
+    -fx-background-color: #ea580c;
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 14 14 14 14;
+    -fx-max-width: 10000;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-alignment: center;
+}
+
+.btn-nav-gray:hover {
+    -fx-background-color: #f97316;
+}
+
+/* ── Back link — text-style back button ── */
+.btn-back {
+    -fx-background-color: transparent;
+    -fx-text-fill: #66c0f4;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 4 12 4 4;
+    -fx-cursor: hand;
+}
+
+.btn-back:hover {
+    -fx-text-fill: #ffffff;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   7. TABLE VIEW
+   ───────────────────────────────────────────────────────────── */
+
+.table-view {
+    -fx-background-color: #162235;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+}
+
+.table-view .filler {
+    -fx-background-color: #1e2c3d;
+}
+
+.table-view .column-header-background {
+    -fx-background-color: #1e2c3d;
+}
+
+.table-view .column-header-background .filler {
+    -fx-background-color: #1e2c3d;
+}
+
+.table-view .column-header {
+    -fx-background-color: #1e2c3d;
+    -fx-border-color: transparent transparent #2a3f5f transparent;
+    -fx-border-width: 0 0 2 0;
+    -fx-padding: 6 10 6 10;
+}
+
+.table-view .column-header .label {
+    -fx-text-fill: #66c0f4;
+    -fx-font-weight: bold;
+    -fx-font-size: 12px;
+}
+
+.table-view .table-row-cell {
+    -fx-background-color: #1b2838;
+    -fx-border-color: transparent;
+}
+
+.table-view .table-row-cell:odd {
+    -fx-background-color: #192533;
+}
+
+.table-view .table-row-cell:hover {
+    -fx-background-color: #243447;
+}
+
+.table-view .table-row-cell:selected {
+    -fx-background-color: #2a475e;
+}
+
+.table-view .table-row-cell .table-cell {
+    -fx-text-fill: #acb2b8;
+    -fx-font-size: 12px;
+    -fx-padding: 6 10 6 10;
+}
+
+.table-view .table-row-cell:selected .table-cell {
+    -fx-text-fill: #ffffff;
+}
+
+/* Empty rows — blend into background */
+.table-row-cell:empty {
+    -fx-background-color: #1b2838;
+}
+
+.table-row-cell:empty .table-cell {
+    -fx-border-width: 0;
+}
+
+.table-view .placeholder .label {
+    -fx-text-fill: #7a818b;
+    -fx-font-size: 13px;
+}
+
+/* Column resize handle */
+.table-view .column-resize-line {
+    -fx-background-color: #66c0f4;
+}
+
+/* Sort arrow */
+.table-view .column-header .arrow {
+    -fx-background-color: #66c0f4;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   8. SCROLL BARS
+   ───────────────────────────────────────────────────────────── */
+
+.scroll-bar {
+    -fx-background-color: transparent;
+}
+
+.scroll-bar .track {
+    -fx-background-color: #171d25;
+    -fx-background-radius: 0;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: #3d4f5f;
+    -fx-background-radius: 3;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: #4a5e72;
+}
+
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.scroll-bar .increment-arrow,
+.scroll-bar .decrement-arrow {
+    -fx-shape: "";
+    -fx-padding: 0;
+}
+
+.scroll-pane {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+.scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   9. LOGIN SCENE
+   ───────────────────────────────────────────────────────────── */
+
+/* Full-scene dark background for login */
+.login-root {
+    -fx-background-color: #171d25;
+}
+
+/* Centered login box */
+.login-card {
+    -fx-background-color: rgba(30, 41, 59, 0.96);
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-border-radius: 16;
+    -fx-background-radius: 16;
+    -fx-padding: 40 36 40 36;
+    -fx-min-width: 440;
+    -fx-max-width: 440;
+    -fx-spacing: 6;
+    -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.5), 24, 0.22, 0, 8);
+}
+
+/* App title on login */
+.login-title {
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #ffffff;
+    -fx-padding: 0 0 2 0;
+    -fx-wrap-text: true;
+}
+
+/* Subtitle on login */
+.login-subtitle {
+    -fx-font-size: 12px;
+    -fx-text-fill: #7a818b;
+    -fx-padding: 0 0 24 0;
+}
+
+/* Login form labels */
+.login-label {
+    -fx-text-fill: #acb2b8;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-padding: 8 0 4 2;
+}
+
+/* Login button — full width primary */
+.btn-login {
+    -fx-background-color: #1a9fff;
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 12 0 12 0;
+    -fx-max-width: 10000;
+    -fx-background-radius: 3;
+    -fx-border-radius: 3;
+    -fx-cursor: hand;
+}
+
+.btn-login:hover {
+    -fx-background-color: #3dabff;
+}
+
+.btn-login:pressed {
+    -fx-background-color: #1580cc;
+}
+
+/* Error message on login */
+.login-error {
+    -fx-text-fill: #cd5c5c;
+    -fx-font-size: 12px;
+    -fx-padding: 8 0 0 0;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   10. DASHBOARD
+   ───────────────────────────────────────────────────────────── */
+
+/* Stat card — one per metric */
+.stat-card {
+    -fx-background-color: #1e293b;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-border-radius: 14;
+    -fx-background-radius: 14;
+    -fx-padding: 18 20 20 20;
+    -fx-min-width: 240;
+    -fx-min-height: 132;
+    -fx-spacing: 14;
+    -fx-alignment: center-left;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.34), 18, 0.2, 0, 6);
+}
+
+/* Blue accent line on top of stat card */
+.stat-card-blue {
+    -fx-border-color: #3b82f6 #334155 #334155 #334155;
+    -fx-border-width: 3 1 1 1;
+}
+
+.stat-card-green {
+    -fx-border-color: #22c55e #334155 #334155 #334155;
+    -fx-border-width: 3 1 1 1;
+}
+
+.stat-card-gray {
+    -fx-border-color: #f59e0b #334155 #334155 #334155;
+    -fx-border-width: 3 1 1 1;
+}
+
+.stat-card-purple {
+    -fx-border-color: #fb923c #334155 #334155 #334155;
+    -fx-border-width: 3 1 1 1;
+}
+
+.stat-icon {
+    -fx-font-size: 18px;
+    -fx-opacity: 0.85;
+}
+
+.icon-sm {
+    -fx-icon-size: 15;
+    -fx-icon-color: #e2e8f0;
+}
+
+.icon-md {
+    -fx-icon-size: 18;
+    -fx-icon-color: #cbd5e1;
+}
+
+.icon-stat {
+    -fx-icon-size: 22;
+    -fx-icon-color: #e2e8f0;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   11. STATUS INDICATORS — for TableView cell text
+   ───────────────────────────────────────────────────────────── */
+
+.status-active {
+    -fx-text-fill: #5ba32b;
+    -fx-font-weight: bold;
+}
+
+.status-inactive {
+    -fx-text-fill: #7c3030;
+    -fx-font-weight: bold;
+}
+
+.status-pending {
+    -fx-text-fill: #b8860b;
+    -fx-font-weight: bold;
+}
+
+.status-available {
+    -fx-text-fill: #5ba32b;
+}
+
+.status-occupied {
+    -fx-text-fill: #cd5c5c;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   12. TOOLTIPS & ALERTS
+   ───────────────────────────────────────────────────────────── */
+
+.tooltip {
+    -fx-background-color: #171d25;
+    -fx-text-fill: #e5e5e5;
+    -fx-border-color: #2a3f5f;
+    -fx-border-width: 1;
+    -fx-font-size: 12px;
+    -fx-background-radius: 3;
+    -fx-border-radius: 3;
+}
+
+.dialog-pane {
+    -fx-background-color: #1b2838;
+}
+
+.dialog-pane .header-panel {
+    -fx-background-color: #171d25;
+}
+
+.dialog-pane .content {
+    -fx-text-fill: #acb2b8;
+}
+
+.dialog-pane .button-bar .button {
+    -fx-background-color: #3d4f5f;
+    -fx-text-fill: #e5e5e5;
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   13. FORM LAYOUT HELPERS
+   ───────────────────────────────────────────────────────────── */
+
+/* Label above a field */
+.field-label {
+    -fx-text-fill: #acb2b8;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-padding: 8 0 4 2;
+}
+
+/* Horizontal row of buttons */
+.button-row {
+    -fx-spacing: 8;
+    -fx-padding: 12 0 0 0;
+}
+
+/* Vertical spacing for form fields */
+.form-fields {
+    -fx-spacing: 4;
+}
+
+/* Table + search wrapper */
+.table-section {
+    -fx-spacing: 10;
+    -fx-padding: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   14. ROLE-BASED DASHBOARD & STATUS EXTENSIONS
+   ───────────────────────────────────────────────────────────── */
+
+/* Role Badges — shown top-right of the header bar on every screen */
+.role-badge-admin {
+    -fx-background-color: rgba(239, 68, 68, 0.15);
+    -fx-text-fill: #ef4444;
+    -fx-border-color: #ef4444;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+    -fx-padding: 3 8 3 8;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.role-badge-zone {
+    -fx-background-color: rgba(245, 158, 11, 0.15);
+    -fx-text-fill: #f59e0b;
+    -fx-border-color: #f59e0b;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+    -fx-padding: 3 8 3 8;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.role-badge-warehouse {
+    -fx-background-color: rgba(20, 184, 166, 0.15);
+    -fx-text-fill: #14b8a6;
+    -fx-border-color: #14b8a6;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+    -fx-padding: 3 8 3 8;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.role-badge-volunteer {
+    -fx-background-color: rgba(59, 130, 246, 0.15);
+    -fx-text-fill: #3b82f6;
+    -fx-border-color: #3b82f6;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+    -fx-padding: 3 8 3 8;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.role-badge-analytics {
+    -fx-background-color: rgba(168, 85, 247, 0.15);
+    -fx-text-fill: #a855f7;
+    -fx-border-color: #a855f7;
+    -fx-border-radius: 3;
+    -fx-background-radius: 3;
+    -fx-padding: 3 8 3 8;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+/* Urgency Status Colors — for resource_requests.urgency, zone severity, etc. */
+.status-critical {
+    -fx-text-fill: #ef4444;
+    -fx-font-weight: bold;
+}
+
+.status-high {
+    -fx-text-fill: #f97316;
+    -fx-font-weight: bold;
+}
+
+.status-medium {
+    -fx-text-fill: #eab308;
+    -fx-font-weight: bold;
+}
+
+.status-low {
+    -fx-text-fill: #22c55e;
+    -fx-font-weight: bold;
+}
+
+/* Low-Stock Alert Highlight — apply to TableRow via rowFactory in InventoryController */
+.row-low-stock {
+    -fx-background-color: rgba(239, 68, 68, 0.1);
+}
+
+.alert-pulse-badge {
+    -fx-background-color: #ef4444;
+    -fx-text-fill: white;
+    -fx-background-radius: 10;
+    -fx-padding: 2 6 2 6;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+/* ==========================================================================
+   15. GEOCODING BUTTON — shelter.fxml "Auto-fill coordinates from address"
+   ========================================================================== */
+
+/* Teal-accented dashed border signals this is an optional helper, not a
+   primary save action. Visually distinct from btn-primary / btn-success. */
+.btn-geocode {
+    -fx-background-color: rgba(20, 184, 166, 0.08);
+    -fx-text-fill: #2dd4bf;
+    -fx-border-color: #2dd4bf;
+    -fx-border-style: dashed;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 7 12 7 12;
+    -fx-font-size: 12px;
+    -fx-cursor: hand;
+}
+
+.btn-geocode:hover {
+    -fx-background-color: rgba(20, 184, 166, 0.18);
+    -fx-border-color: #5eead4;
+    -fx-text-fill: #5eead4;
+}
+
+/* In-flight state (button is disabled while the HTTP request is running) */
+.btn-geocode:disabled {
+    -fx-background-color: rgba(20, 184, 166, 0.04);
+    -fx-text-fill: #64748b;
+    -fx-border-color: #334155;
+    -fx-border-style: dashed;
+    -fx-opacity: 0.7;
+    -fx-cursor: default;
+}
+

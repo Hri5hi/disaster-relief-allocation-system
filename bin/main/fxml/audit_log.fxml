@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import org.kordamp.ikonli.javafx.FontIcon?>
+
+<!-- System Mutation Audit Trail (Read-Only)
+     Target Role: System Administrator ONLY
+     Key Features: operation/user/date filters, JSON diff viewer,
+                   table populated entirely by trg_audit_log trigger
+     Layout: Adapted from Hostel-Management-System allocation.fxml pattern
+             with additional bottom pane for JSON diff display -->
+<BorderPane minHeight="600.0" minWidth="900.0" prefHeight="900.0" prefWidth="1300.0"
+            xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.groupa13.disasterrelief.controller.AuditLogController">
+   <top>
+      <HBox alignment="CENTER_LEFT" minHeight="72.0" spacing="20.0" styleClass="header-bar" BorderPane.alignment="CENTER">
+         <padding>
+            <Insets bottom="12.0" left="16.0" right="16.0" top="12.0" />
+         </padding>
+         <children>
+            <Button mnemonicParsing="false" onAction="#goBack" styleClass="btn-back" text="Dashboard">
+               <graphic>
+                  <FontIcon iconLiteral="fas-arrow-left" styleClass="icon-sm" />
+               </graphic>
+            </Button>
+            <Label styleClass="page-title" text="Audit Log Viewer" />
+            <Label fx:id="roleBadge" styleClass="role-badge-admin" text="" />
+         </children>
+      </HBox>
+   </top>
+   <left>
+      <ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" maxWidth="420.0" minWidth="280.0" prefWidth="380.0" vbarPolicy="AS_NEEDED" BorderPane.alignment="CENTER">
+         <content>
+            <VBox minWidth="280.0" spacing="4.0" styleClass="form-panel panel-card">
+               <padding>
+                  <Insets bottom="40.0" left="12.0" right="12.0" top="12.0" />
+               </padding>
+               <children>
+                  <Label fx:id="errorLabel" maxWidth="1.7976931348623157E308" minHeight="18.0" styleClass="login-error" text="" wrapText="true" />
+
+                  <Label styleClass="section-title" text="Audit Filters" />
+                  <Label styleClass="text-muted" text="All data is trigger-populated — read-only viewer" />
+
+                  <!-- Filter by table name -->
+                  <Label styleClass="field-label" text="Table Name" />
+                  <ComboBox fx:id="tableNameCombo" maxWidth="1.7976931348623157E308" promptText="Filter by table..." />
+
+                  <!-- Filter by operation type -->
+                  <Label styleClass="field-label" text="Operation" />
+                  <ComboBox fx:id="operationCombo" maxWidth="1.7976931348623157E308" />
+
+                  <!-- Filter by user -->
+                  <Label styleClass="field-label" text="Changed By" />
+                  <TextField fx:id="changedByField" promptText="e.g. admin_user" />
+
+                  <!-- Date range filter -->
+                  <Label styleClass="field-label" text="From Date (yyyy-MM-dd)" />
+                  <TextField fx:id="dateFromField" promptText="e.g. 2026-07-01" />
+
+                  <Label styleClass="field-label" text="To Date (yyyy-MM-dd)" />
+                  <TextField fx:id="dateToField" promptText="e.g. 2026-07-31" />
+
+                  <!-- Search by log ID -->
+                  <Label styleClass="field-label" text="Log ID" />
+                  <TextField fx:id="logIdField" promptText="Enter specific log ID" />
+
+                  <Separator prefWidth="200.0" />
+
+                  <!-- Filter/Search Buttons -->
+                  <HBox minHeight="48.0" spacing="8.0">
+                     <children>
+                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleApplyFilters" styleClass="btn-primary" text="Apply Filters" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-filter" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleFindById" styleClass="btn-neutral" text="Find by ID" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-search" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                     </children>
+                  </HBox>
+                  <HBox minHeight="48.0" spacing="8.0">
+                     <children>
+                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleShowDiff" styleClass="btn-success" text="Show JSON Diff" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-exchange-alt" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleClear" styleClass="btn-outline" text="Clear" HBox.hgrow="ALWAYS">
+                           <graphic>
+                              <FontIcon iconLiteral="fas-eraser" styleClass="icon-sm" />
+                           </graphic>
+                        </Button>
+                     </children>
+                  </HBox>
+               </children>
+            </VBox>
+         </content>
+      </ScrollPane>
+   </left>
+   <center>
+      <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" spacing="10.0" styleClass="content-area panel-card" BorderPane.alignment="CENTER">
+         <padding>
+            <Insets bottom="16.0" left="16.0" right="16.0" top="16.0" />
+         </padding>
+         <children>
+            <!-- Audit log table -->
+            <TableView fx:id="auditTable" minHeight="200.0" minWidth="400.0" VBox.vgrow="ALWAYS">
+               <columns>
+                  <TableColumn fx:id="colLogId" minWidth="64.0" prefWidth="70.0" text="ID" />
+                  <TableColumn fx:id="colTableName" minWidth="100.0" prefWidth="130.0" text="Table" />
+                  <TableColumn fx:id="colOperation" minWidth="70.0" prefWidth="90.0" text="Operation" />
+                  <TableColumn fx:id="colChangedBy" minWidth="90.0" prefWidth="120.0" text="Changed By" />
+                  <TableColumn fx:id="colChangedAt" minWidth="140.0" prefWidth="170.0" text="Changed At" />
+                  <TableColumn fx:id="colOldValues" minWidth="160.0" prefWidth="200.0" text="Old Values (JSONB)" />
+                  <TableColumn fx:id="colNewValues" minWidth="160.0" prefWidth="200.0" text="New Values (JSONB)" />
+               </columns>
+            </TableView>
+
+            <!-- JSON Diff Viewer panel -->
+            <Label styleClass="section-title" text="JSON Diff Viewer" />
+            <HBox spacing="10.0" VBox.vgrow="SOMETIMES">
+               <children>
+                  <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                     <children>
+                        <Label styleClass="field-label" text="Old Values" />
+                        <TextArea fx:id="oldValuesArea" editable="false" prefHeight="150.0"
+                                  promptText="Select a row and click 'Show JSON Diff'" wrapText="true"
+                                  style="-fx-control-inner-background: #1b2838; -fx-text-fill: #ef4444;" />
+                     </children>
+                  </VBox>
+                  <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                     <children>
+                        <Label styleClass="field-label" text="New Values" />
+                        <TextArea fx:id="newValuesArea" editable="false" prefHeight="150.0"
+                                  promptText="Select a row and click 'Show JSON Diff'" wrapText="true"
+                                  style="-fx-control-inner-background: #1b2838; -fx-text-fill: #22c55e;" />
+                     </children>
+                  </VBox>
+               </children>
+            </HBox>
+         </children>
+      </VBox>
+   </center>
+</BorderPane>

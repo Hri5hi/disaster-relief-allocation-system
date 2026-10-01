@@ -15,7 +15,7 @@ Per Section 4 of `project_description_v2.md`, the system supports **5 distinct u
 
 | Role | Primary Responsibility | Visible Dashboard Stats | Accessible Screens | Access Level |
 |---|---|---|---|---|
-| **1. System Administrator** (`SYSTEM_ADMIN`) | System configuration, disaster setup, overall supervision | Active Disasters, Total Shelters, Pending Requests, Active Volunteers, Audit Events | **ALL 13 Screens** (Full Unrestricted Access) | Unrestricted |
+| **1. System Administrator** (`SYSTEM_ADMIN`) | System configuration, disaster setup, overall supervision | Active Disasters, Total Shelters, Pending Requests, Active Volunteers, Audit Events | **ALL 15 Screens** (Full Unrestricted Access) | Unrestricted |
 | **2. Zone Coordinator** (`ZONE_COORDINATOR`) | Zone-specific operations, requesting supplies, registering displaced people | Assigned Zone Severity, Zone Shelter Occupancy %, Pending Zone Requests, Affected Persons in Zone | `dashboard.fxml`, `resource_request.fxml`, `affected_person.fxml`, `shelter.fxml` (read-only), `analytics.fxml` (zone deficit tab) | Restricted to assigned zone via Row-Level Security (RLS) |
 | **3. Warehouse / Inventory Manager** (`WAREHOUSE_MANAGER`) | Stock tracking, processing donations, fulfilling transfers | Low-Stock Alerts (`LISTEN/NOTIFY`), Pending Fulfillments, Total Items in Stock, Recent Donations | `dashboard.fxml`, `inventory.fxml`, `resource_request.fxml` (fulfillment mode), `donation.fxml`, `distribution_log.fxml` | Access to inventory, requests, donations & logs |
 | **4. Volunteer Coordinator** (`VOLUNTEER_COORDINATOR`) | Volunteer registration, skill matching, shift scheduling | Total Volunteers, Shifts Scheduled Today, Unassigned Volunteers, Skill Types Count | `dashboard.fxml`, `volunteer.fxml`, `volunteer_shift.fxml` | Access to volunteers & shifts |
@@ -112,7 +112,7 @@ Upon loading `dashboard.fxml`:
 | 2 | `dashboard.fxml` | Dynamic role-adapted dashboard | All Roles (Custom View) | Header bar, 4-6 Stat Cards, Dynamic Nav FlowPane |
 | 3 | `disaster.fxml` | Disaster lifecycle & active periods | Admin | TableView, daterange picker, status ComboBox |
 | 4 | `zone.fxml` | Zone creation & primary shelter assignment | Admin | TableView, disaster dropdown, shelter dropdown |
-| 5 | `shelter.fxml` | Shelter capacity, occupancy & location | Admin, Zone Coord, Analytics | TableView, occupancy bar, coordinate fields |
+| 5 | `shelter.fxml` | Shelter registration, capacity, occupancy & location | Admin, Zone Coord, Analytics | TableView, occupancy bar, address text field, lat/lng fields, *"Auto-fill coordinates"* button (Nominatim API) |
 | 6 | `resource.fxml` | Resource catalog & hierarchical categories | Admin, Warehouse Mgr | Category TreeView, resource TableView, unit input |
 | 7 | `inventory.fxml` | Shelter inventory & reorder levels | Warehouse Mgr, Admin | TableView with low-stock highlight, reorder level editor |
 | 8 | `resource_request.fxml` | Priority request submission & fulfillment | Zone Coord, Warehouse Mgr, Admin | Priority score column, urgency tags, Fulfill button |
@@ -220,8 +220,91 @@ Add the following to section 14 of `application.css`:
 - [ ] **System Admin View:** Build `disaster.fxml`, `zone.fxml`, `resource.fxml`, and `audit_log.fxml`.
 
 ### Phase 3 — Verification & Role Testing (Days 7-8)
-- [ ] Login test as `SYSTEM_ADMIN`: Verify all 13 screens accessible.
+- [ ] Login test as `SYSTEM_ADMIN`: Verify all 15 screens accessible.
 - [ ] Login test as `ZONE_COORDINATOR`: Verify dashboard shows only Zone requests, Affected Persons, Shelter status, and Zone deficit. Attempt unauthorized navigation guard test.
 - [ ] Login test as `WAREHOUSE_MANAGER`: Verify Low-Stock alert highlights, donation intake, and fulfillment action calling `fn_allocate_resources()`.
 - [ ] Login test as `VOLUNTEER_COORDINATOR`: Verify volunteer skill array searching and shift exclusion validation.
 - [ ] Login test as `ANALYTICS_USER`: Verify read-only charts, deficit reports, and materialized view dashboard rendering.
+
+---
+
+## 9. Shelter Registration Form — Location & Geocoding Design
+
+> **Relevant screen:** `shelter.fxml` (managed by Developer A — `ShelterController.java`)
+
+### 9.1 The Problem
+Shelter location is stored in the database as a PostgreSQL custom composite type `coordinates(latitude, longitude)`. Displaying raw lat/lng values (`11.5123, 76.0456`) in UI tables, dropdowns, and reports is unreadable to field coordinators.
+
+### 9.2 Solution — Two Decoupled Fields
+
+The `shelters` table stores location in two complementary columns:
+
+| Column | Type | Purpose | Who sees it |
+|---|---|---|---|
+| `address` | `VARCHAR(255)` | Human-readable location text | **UI tables, reports, dropdowns, printed forms** |
+| `location` | `coordinates` composite | Lat/lng for backend spatial queries | Internal only — never displayed raw |
+
+### 9.3 Shelter Registration Form Layout (`shelter.fxml`)
+
+```
+┌─────────────────────────────────────────────────┐
+│  Register / Edit Shelter                         │
+├─────────────────────────────────────────────────┤
+│  Shelter Name      [ ________________________ ]  │
+│                                                  │
+│  Address           [ ________________________ ]  │
+│                    [ ________________________ ]  │
+│                          ↑ free text, displayed  │
+│                            in all UI tables      │
+│                                                  │
+│  Coordinates (optional)                          │
+│  Latitude   [ _________ ]  Longitude [ _______ ] │
+│                                                  │
+│  [ 📍 Auto-fill from Address ]  ← Nominatim btn  │
+│                                                  │
+│  Capacity   [ _____ ]   Status [ Operational ▼ ] │
+│                                                  │
+│            [ Cancel ]  [ Save Shelter ]          │
+└─────────────────────────────────────────────────┘
+```
+
+### 9.4 "Auto-fill coordinates" Button Behaviour (`ShelterController.java`)
+
+```java
+@FXML
+private void handleAutoFillCoordinates() {
+    String address = addressField.getText().trim();
+    if (address.isEmpty()) {
+        showWarning("Enter an address first.");
+        return;
+    }
+    try {
+        // Call Nominatim — free, no API key required
+        String url = "https://nominatim.openstreetmap.org/search?q="
+                   + URLEncoder.encode(address, StandardCharsets.UTF_8)
+                   + "&format=json&limit=1";
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("User-Agent", "DRRAS/1.0")   // Nominatim requires User-Agent
+                .GET().build();
+        HttpResponse<String> response = client.send(request, BodyHandlers.ofString());
+        JSONArray results = new JSONArray(response.body());
+        if (!results.isEmpty()) {
+            JSONObject first = results.getJSONObject(0);
+            latitudeField.setText(first.getString("lat"));
+            longitudeField.setText(first.getString("lon"));
+        } else {
+            showWarning("Address not found. Enter coordinates manually.");
+        }
+    } catch (Exception e) {
+        // Graceful degradation — API unreachable (no network in disaster zone)
+        showWarning("Geocoding unavailable offline. Enter coordinates manually if needed.");
+    }
+}
+```
+
+### 9.5 Offline Degradation Rule
+- `address` is **always required** (NOT NULL in practice) — coordinators always know the physical address.
+- `location` (coordinates) is **optional** — if offline during registration, leave blank. The system still works; coordinates are only needed if spatial proximity queries are run later.
+- The button is disabled with a tooltip *"Requires internet connection"* if the app detects no network at startup.

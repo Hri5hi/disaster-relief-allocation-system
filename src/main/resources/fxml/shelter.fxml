@@ -9,6 +9,7 @@
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.Tooltip?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
@@ -46,11 +47,27 @@
                   <Label styleClass="field-label" text="Name" />
                   <TextField fx:id="nameField" promptText="e.g. Government School Hall, Meppadi" />
 
-                  <Label styleClass="field-label" text="Latitude" />
-                  <TextField fx:id="latitudeField" promptText="e.g. 11.6091" />
+                  <!-- Address: human-readable; always displayed in UI tables, reports and dropdowns -->
+                  <Label styleClass="field-label" text="Address" />
+                  <TextField fx:id="addressField" promptText="e.g. Meppadi, Wayanad, Kerala 673577" />
 
-                  <Label styleClass="field-label" text="Longitude" />
-                  <TextField fx:id="longitudeField" promptText="e.g. 76.0851" />
+                  <!-- Coordinates: optional — used for backend spatial queries and map pins -->
+                  <Label styleClass="field-label" text="Coordinates (optional)" />
+                  <HBox spacing="8.0">
+                     <children>
+                        <TextField fx:id="latitudeField" promptText="Latitude" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308" />
+                        <TextField fx:id="longitudeField" promptText="Longitude" HBox.hgrow="ALWAYS" maxWidth="1.7976931348623157E308" />
+                     </children>
+                  </HBox>
+
+                  <!-- Geocoding button: Nominatim API auto-fills lat/lng from address above -->
+                  <Button fx:id="btnAutoFill" maxWidth="1.7976931348623157E308" mnemonicParsing="false"
+                          onAction="#handleAutoFillCoordinates" styleClass="btn-geocode"
+                          text="📍  Auto-fill coordinates from address">
+                     <tooltip>
+                        <Tooltip text="Uses OpenStreetMap Nominatim to populate Latitude and Longitude from the address. Requires internet access. If offline, enter coordinates manually or leave blank." />
+                     </tooltip>
+                  </Button>
 
                   <Label styleClass="field-label" text="Capacity" />
                   <TextField fx:id="capacityField" promptText="Maximum occupancy" />
@@ -114,8 +131,8 @@
             <TableView fx:id="shelterTable" minHeight="200.0" minWidth="400.0" VBox.vgrow="ALWAYS">
                <columns>
                   <TableColumn fx:id="colShelterId" minWidth="70.0" prefWidth="90.0" text="Shelter ID" />
-                  <TableColumn fx:id="colName" minWidth="140.0" prefWidth="220.0" text="Name" />
-                  <TableColumn fx:id="colCoordinates" minWidth="120.0" prefWidth="150.0" text="Coordinates" />
+                  <TableColumn fx:id="colName" minWidth="140.0" prefWidth="200.0" text="Name" />
+                  <TableColumn fx:id="colAddress" minWidth="160.0" prefWidth="240.0" text="Address" />
                   <TableColumn fx:id="colCapacity" minWidth="70.0" prefWidth="80.0" text="Capacity" />
                   <TableColumn fx:id="colOccupancy" minWidth="70.0" prefWidth="80.0" text="Occupancy" />
                   <TableColumn fx:id="colOccupancyBar" minWidth="120.0" prefWidth="160.0" text="Occupancy %" />

@@ -72,9 +72,9 @@ In practice, disaster relief coordination in India (and globally) still relies h
 | **Connection Pooling** | **HikariCP** | High-performance JDBC connection pool replacing the current connection-per-query pattern |
 | **Build System** | **Gradle** | Existing build system; only the driver dependency changes (MySQL → PostgreSQL) |
 
-### Database Schema — All 13 Tables
+### Database Schema — All 14 Tables
 
-The system uses **13 tables** organized into 6 functional groups. Each table is listed below with its key columns, data types, and relationships.
+The system uses **14 tables** organized into 6 functional groups. Each table is listed below with its key columns, data types, and relationships.
 
 ---
 
@@ -115,10 +115,14 @@ The system uses **13 tables** organized into 6 functional groups. Each table is 
 |---|---|---|
 | `shelter_id` | `SERIAL PRIMARY KEY` | Auto-incrementing ID |
 | `name` | `VARCHAR(100) NOT NULL` | e.g., "Government School Hall, Meppadi" |
-| `location` | `coordinates` | **Custom composite type** — `(latitude DOUBLE PRECISION, longitude DOUBLE PRECISION)` |
+| `address` | `VARCHAR(255)` | Human-readable address displayed in the UI, e.g., "Meppadi, Wayanad, Kerala 673577". Entered by the coordinator on registration. See § UI Design Decision below. |
+| `location` | `coordinates` | **Custom composite type** — `(latitude DOUBLE PRECISION, longitude DOUBLE PRECISION)`. Used for backend spatial queries and map pin rendering. Optionally auto-filled from address via Nominatim geocoding. |
 | `capacity` | `INTEGER NOT NULL` | CHECK: `capacity > 0` |
 | `current_occupancy` | `INTEGER DEFAULT 0` | Auto-updated by trigger; CHECK: `current_occupancy >= 0` |
 | `status` | `VARCHAR(20)` | CHECK: `'operational'`, `'full'`, `'closed'` |
+
+> **UI Design Decision — Shelter Location Entry (`shelter.fxml`):**  
+> The shelter registration form exposes **two separate fields**: a free-text *Address* field and optional *Latitude / Longitude* fields. The form also includes an *"Auto-fill coordinates from address"* button which calls the [OpenStreetMap Nominatim API](https://nominatim.org/) (`GET /search?q=<address>&format=json`) to populate coordinates automatically when internet is available. If the API is unreachable (common during active disasters), the coordinator can enter coordinates manually or leave them blank — the system degrades gracefully since `location` is not enforced as NOT NULL at the form level. `address` is always the field displayed in all UI tables, reports, and printed forms; raw coordinates are never shown to end users.
 
 **Table 4 — `resource_categories`** *(self-referencing for hierarchy)*
 

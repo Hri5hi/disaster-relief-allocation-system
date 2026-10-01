@@ -920,3 +920,39 @@
     -fx-font-size: 10px;
     -fx-font-weight: bold;
 }
+
+/* ==========================================================================
+   15. GEOCODING BUTTON — shelter.fxml "Auto-fill coordinates from address"
+   ========================================================================== */
+
+/* Teal-accented dashed border signals this is an optional helper, not a
+   primary save action. Visually distinct from btn-primary / btn-success. */
+.btn-geocode {
+    -fx-background-color: rgba(20, 184, 166, 0.08);
+    -fx-text-fill: #2dd4bf;
+    -fx-border-color: #2dd4bf;
+    -fx-border-style: dashed;
+    -fx-border-width: 1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 7 12 7 12;
+    -fx-font-size: 12px;
+    -fx-cursor: hand;
+}
+
+.btn-geocode:hover {
+    -fx-background-color: rgba(20, 184, 166, 0.18);
+    -fx-border-color: #5eead4;
+    -fx-text-fill: #5eead4;
+}
+
+/* In-flight state (button is disabled while the HTTP request is running) */
+.btn-geocode:disabled {
+    -fx-background-color: rgba(20, 184, 166, 0.04);
+    -fx-text-fill: #64748b;
+    -fx-border-color: #334155;
+    -fx-border-style: dashed;
+    -fx-opacity: 0.7;
+    -fx-cursor: default;
+}
+
