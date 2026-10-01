@@ -17,29 +17,27 @@ The source of truth for file ownership is Section 5 of `BACKEND_IMPLEMENTATION_P
 
 ## 2. Wave 0 — team decisions before coding
 
-Meet briefly and write the agreed answers in Section 9 of the backend plan.
+The team has ratified the following Wave 0 decisions (recorded in Section 9 of [BACKEND_IMPLEMENTATION_PLAN.md](BACKEND_IMPLEMENTATION_PLAN.md)):
 
-| Decision | Recommended choice | Why it matters |
-|---|---|---|
-| Authentication table | Add `app_users` linked to `people` | Real login requires usernames, password hashes, roles, and zone assignments. |
-| Database IDs | Use integer primary keys; format IDs only for display | Keeps foreign keys, queries, and JDBC mapping simple. |
-| Request destination | Fulfill a zone request to its primary shelter | Gives `fn_allocate_resources` an unambiguous destination. |
-| Demo accounts | One active account for each of the five roles | Makes role/RLS testing repeatable. |
-| Partition maintenance | Create current and next month distribution partitions | Prevents allocation failures at the start of a new month. |
-
-Also agree on:
-
-- PostgreSQL database name and local developer credentials.
-- Branch naming: `feature/backend-core`, `feature/backend-people`, and `feature/backend-operations`.
-- Seed usernames; never put real passwords in Git.
-- A short error-message style, for example: “Insufficient stock at source shelter” rather than a raw SQL error.
+| Decision | Agreed choice | Implementation owner & timing | Why it matters |
+|---|---|---|---|
+| Database name | `dras` (DRAS) | Dev A (Wave 1) | Establishes uniform database naming across Docker, Flyway, and environment configs. |
+| Developer credentials | Local git-ignored config files | All Devs (post-Wave 1 baseline) | Populated locally in `.env` / `config/application.properties`; never committed to Git. |
+| Branch naming | `feature/dev-a`, `feature/dev-b`, `feature/dev-c` | Dev A, Dev B, Dev C (Waves 1–3) | Developer-letter branches corresponding to each developer's owned subsystem. |
+| Authentication table | Add `app_users` linked to `people` | Dev C (Wave 3 schema, Wave 4 docs) | Real login requires usernames, BCrypt hashes, roles, and zone assignments; brings physical table count to 15. |
+| Database IDs | Use integer primary keys; format IDs only for display | All Devs (Waves 1–3) | Keeps foreign keys, queries, and JDBC mapping simple while maintaining UI conventions (e.g., `D1001`). |
+| Request destination | Selectable destination shelter via `destination_shelter_id` | Dev C (Wave 2 V005 schema, Wave 3 V006 logic) | Allows requests to specify exact destination shelter, not just default primary shelter. |
+| Demo accounts | One active account for each of the five roles | Dev C (Wave 3 V008) | Provides seed users (`admin`, `zone_coord`, etc.) with BCrypt hashes for role/RLS verification without committing real passwords. |
+| Partition maintenance | Create current and next month distribution partitions | Dev C (Wave 2 V005, Wave 3 V006) | Prevents allocation failures at the start of a new month. |
+| Audit log scope | Track 10 mutable operational tables | Dev C (Wave 2 V005, Wave 3 V006) | Captures changes on disasters, zones, shelters, resources, inventory, volunteers, affected persons, requests, shifts, donations. |
+| Error-message style | Short, user-friendly messages (e.g., “Insufficient stock at source shelter”) | All Devs in service layer (Waves 2–3) | Maps SQLState class 23 and domain violations into clean UI feedback instead of raw SQL crashes. |
 
 ## 3. Local setup for every developer
 
 After Dev A merges the platform baseline:
 
-1. Pull `main` and create your own feature branch.
-2. Copy the example configuration to your ignored local configuration file and supply local database credentials.
+1. Pull `main` and create your own developer branch (`feature/dev-a`, `feature/dev-b`, or `feature/dev-c`).
+2. Copy the example configuration (`config/application.properties.example`, `.env.example`) to your ignored local configuration file (`config/application.properties`, `.env`) and supply your local database credentials once Dev A has completed initial setup.
 3. Start PostgreSQL with Docker Compose.
 4. Run the migration command configured by Dev A. Verify that Flyway applies migrations in `database/migrations/`.
 5. Run `./gradlew test` before starting a task. Fix a broken baseline before adding work.

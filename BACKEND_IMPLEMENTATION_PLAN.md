@@ -55,7 +55,7 @@ Migrations live in `database/migrations/` and are run by Flyway in lexical versi
 | `V002__core_schema.sql` | Dev A | `disasters`, `zones`, `shelters`, `resource_categories`, `resources`, `shelter_inventory`; resolve the zone/primary-shelter circular FK after both tables exist |
 | `V003__core_constraints_indexes.sql` | Dev A | Core checks, foreign keys, composite/partial indexes, recursive category indexes, and inventory uniqueness |
 | `V004__people_schema.sql` | Dev B | `people`, `volunteers`, `affected_persons`, `volunteer_shifts`; `TEXT[]`, `JSONB`, `tsrange`, GiST exclusion constraint, and shelter-occupancy trigger |
-| `V005__operations_schema.sql` | Dev C | `resource_requests`, monthly range-partitioned `distribution_log`, `donation_records`, and `audit_log`; generated priority score and operational indexes |
+| `V005__operations_schema.sql` | Dev C | `resource_requests` (with selectable `destination_shelter_id`), monthly range-partitioned `distribution_log` (active and next-month partitions), `donation_records`, and `audit_log`; generated priority score and operational indexes |
 | `V006__operations_logic.sql` | Dev C | Allocation, donation, volunteer registration/shift functions; partition-creation helper; low-stock, disaster-close, and audit triggers |
 | `V007__security_views_analytics.sql` | Dev C | `app_users`, database roles/grants, RLS policies, regular views, materialized views, deficit report function, and concurrent-refresh indexes |
 | `V008__development_seed.sql` | Dev C | Idempotent demonstration users and coherent development data that exercises every role and workflow |
@@ -70,7 +70,7 @@ Migrations live in `database/migrations/` and are run by Flyway in lexical versi
 - `fn_process_donation` validates the donation JSONB array and performs one transaction: insert immutable `donation_records`, UPSERT each inventory line, then return the donation ID and affected stock lines.
 - `distribution_log` is range partitioned by `distributed_at`; create the active and next-month partitions during migration/maintenance and retain a default partition only as a safety net.
 - `trg_low_stock_alert` emits a JSON payload on `low_stock_alert` only when stock crosses from at/above reorder level to below it. This avoids alert floods on every subsequent update.
-- `trg_audit_log` captures `INSERT`, `UPDATE`, and `DELETE` on all mutable operational tables using `to_jsonb(OLD)`/`to_jsonb(NEW)`. Application roles receive no `INSERT`, `UPDATE`, or `DELETE` grant on `audit_log`.
+- `trg_audit_log` captures `INSERT`, `UPDATE`, and `DELETE` on the 10 mutable operational tables (`disasters`, `zones`, `shelters`, `resources`, `shelter_inventory`, `volunteers`, `affected_persons`, `resource_requests`, `volunteer_shifts`, and `donation_records`) using `to_jsonb(OLD)`/`to_jsonb(NEW)`. Application roles receive no `INSERT`, `UPDATE`, or `DELETE` grant on `audit_log`.
 - Views: `v_shelter_dashboard`, `v_pending_requests_ranked`, `v_volunteer_availability`, and `v_active_disasters`. Materialized views: `mv_zone_resource_summary` and `mv_daily_distribution_stats`, each with a unique index required for `REFRESH MATERIALIZED VIEW CONCURRENTLY`.
 - RLS applies at minimum to zones, resource requests, affected persons, and their zone-scoped reads. A coordinator connection sets `app.current_zone_id` with `set_config(..., true)` inside the same transaction; never use a pool-wide session variable.
 
@@ -278,10 +278,37 @@ The backend is complete only when all of the following are true:
 - Constraint, trigger, audit, notification, RLS, and analytics tests pass on PostgreSQL 15 via Testcontainers.
 - `./gradlew clean test build` succeeds from a clean clone, with a README that documents configuration, migration, test, and demo-login steps.
 
-## 9. Decisions to record before Wave 1
+## 9. Ratified Wave 0 decisions (recorded before Wave 1)
 
-- PostgreSQL database name, non-production user names, and seed usernames (never commit production passwords).
-- Whether disaster IDs displayed in the UI remain formatted (`D1001`) while database keys are integers, or whether all UI identifiers move to integer IDs. The recommended choice is integer database IDs with display formatting in the controller.
-- Development-data retention policy and monthly `distribution_log` partition maintenance cadence.
-- The operational definition of a request’s destination: this plan assumes a zone request is fulfilled to that zone’s primary shelter. If multiple destination shelters must be selectable, add `destination_shelter_id` to `resource_requests` in a new migration before V006 is implemented.
-- Which mutable tables are included in `trg_audit_log`; recommended: disasters, zones, shelters, resources, inventory, volunteers, affected persons, requests, shifts, and donations.
+The following architectural and operational decisions have been ratified during Wave 0 and govern all subsequent implementation:
+
+1. **Database name and runtime credentials:**
+   - **Database name:** `dras` (DRAS).
+   - **Credentials:** Local developer credentials (username, password, port) are configured in ignored local files (`.env`, `config/application.properties`) copied from templates provided by Dev A (`.env.example`, `config/application.properties.example`) once Dev A delivers the platform baseline in Wave 1. No developer credentials or secrets are ever committed to Git.
+2. **Branch naming:**
+   - Developer letter-based branch naming is adopted:
+     - Dev A: `feature/dev-a` (core platform, geography, shelters, catalog, inventory, migrations V001–V003)
+     - Dev B: `feature/dev-b` (people, volunteers, affected persons, shifts, migration V004)
+     - Dev C: `feature/dev-c` (operations, auth, allocation, donations, audit, analytics, migrations V005–V008)
+3. **Database primary keys and identifier display:**
+   - All database tables use integer primary and foreign keys (`SERIAL` / `INTEGER`).
+   - Prefix-formatted identifiers (e.g., `D1001`, `S101`, `R201`) are presentation-layer formatting applied in the controllers; Java services and DAOs exchange integer IDs.
+4. **Selectable destination shelter:**
+   - Multiple destination shelters must be selectable: `destination_shelter_id INT REFERENCES shelters(shelter_id)` is added directly to `resource_requests` in `V005__operations_schema.sql` (owned by Dev C).
+   - The allocation function `fn_allocate_resources(request_id, source_shelter_id)` in `V006` fulfills the request by crediting the specific `destination_shelter_id`.
+5. **Audit log scope (`trg_audit_log`):**
+   - The 10 mutable tables captured by `trg_audit_log` are: `disasters`, `zones`, `shelters`, `resources`, `shelter_inventory`, `volunteers`, `affected_persons`, `resource_requests`, `volunteer_shifts`, and `donation_records`.
+   - Owned by Dev C in `V005` (table) and `V006` (trigger function & table triggers), with review by Dev A & Dev B.
+6. **Application identity (`app_users`) and documentation:**
+   - `app_users` support table linked to `people(person_id)` with `username`, BCrypt password hash, role, optional `assigned_zone_id`, and active status.
+   - Total physical schema count is 15 tables (14 operational/audit tables in original design + `app_users`).
+   - Implemented by Dev C in **Wave 3** (`V007__security_views_analytics.sql`) after Dev B's `people` table merges in Wave 2. Dev C updates the schema count and status in `README.md` and project documents in Wave 3/4.
+7. **Seed accounts and security:**
+   - One active account per role (5 roles total): `admin` (System Administrator), `zone_coord` (Zone Coordinator), `warehouse_mgr` (Warehouse Manager), `shelter_mgr` (Shelter Manager), and `logistics_officer` (Logistics Officer).
+   - Populated in `V008__development_seed.sql` by Dev C in **Wave 3**.
+   - Passwords exist in Git strictly as BCrypt hashes. Standard demonstration passwords for testing/evaluation are documented in `README.md`; no personal or production passwords are ever committed.
+8. **Distribution log partition maintenance:**
+   - Current month and next month range partitions for `distribution_log` are created in `V005__operations_schema.sql`.
+   - Ongoing monthly partition creation helper is provided in `V006__operations_logic.sql` by Dev C.
+9. **Error message convention:**
+   - Short, user-friendly error messages (e.g., “Insufficient stock at source shelter”, “Volunteer already has an overlapping shift”) are returned by services via `ServiceResult<T>(false, null, message)` and controller dialogs. Raw SQL exceptions and SQLState codes are never exposed to the UI.
