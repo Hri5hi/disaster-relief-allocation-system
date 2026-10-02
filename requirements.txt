@@ -1,0 +1,109 @@
+# ==============================================================================
+# Disaster Relief Resource Allocation System (DRRAS)
+# System Requirements & Dependencies Specification
+# ==============================================================================
+# 
+# NOTE: This is a Java / Gradle project. 
+# All Java library dependencies (JARs) listed in Part 3 are AUTOMATICALLY 
+# downloaded by Gradle from Maven Central when you execute './gradlew run' or 
+# './gradlew test'. You DO NOT need to manually download JAR files.
+#
+# However, the HOST SYSTEM PREREQUISITES listed in Part 1 and Part 2 MUST be 
+# installed and configured on any fresh machine before running the project.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. HOST SYSTEM PREREQUISITES (Must be installed manually on a fresh machine)
+# ------------------------------------------------------------------------------
+
+# Java Development Kit (MANDATORY)
+# Version: OpenJDK 21 (LTS) or Eclipse Temurin 21 (LTS)
+# Environment: JAVA_HOME must point to JDK 21 installation directory
+# Verification: java -version  (must report version 21.x.x)
+JDK=21
+
+# Container Engine (RECOMMENDED for Database and Testcontainers)
+# Tool: Docker Desktop (Windows / macOS) or Docker Engine + Compose (Linux)
+# Version: Docker Engine 24.0+ / Docker Compose v2+
+# Purpose: Runs PostgreSQL 15 database container and automated integration tests
+# Verification: docker --version && docker compose version
+DOCKER=24.0+
+
+# Alternative Database (If Docker is NOT used)
+# Tool: PostgreSQL Server
+# Version: 15.0 or higher (PostgreSQL 15, 16, 17, 18 supported)
+# Required Extension: btree_gist (included with standard PostgreSQL distribution)
+# Verification: psql --version
+POSTGRESQL=15+
+
+# Version Control
+# Tool: Git
+# Verification: git --version
+GIT=2.30+
+
+
+# ------------------------------------------------------------------------------
+# 2. LOCAL CONFIGURATION SETUP (Must be created on a fresh machine)
+# ------------------------------------------------------------------------------
+# 
+# 1. Copy the example configuration template:
+#    cp config/application.properties.example config/application.properties
+#    (or copy .env.example to .env)
+#
+# 2. Configure your database connection in config/application.properties:
+#    db.url=jdbc:postgresql://localhost:5432/dras
+#    db.username=dras_app
+#    db.password=<your_password>
+#    db.pool.size=5
+#    db.timeout.ms=10000
+
+
+# ------------------------------------------------------------------------------
+# 3. GRADLE DEPENDENCIES (Downloaded AUTOMATICALLY by Gradle via Maven Central)
+# ------------------------------------------------------------------------------
+# The Gradle Wrapper (./gradlew or gradlew.bat) downloads these automatically:
+
+# Build Tool & Wrapper:
+# - Gradle Wrapper 8.x (bundled in repo via gradlew / gradlew.bat)
+
+# UI Framework (JavaFX 21 - platform specific):
+org.openjfx:javafx-base:21
+org.openjfx:javafx-controls:21
+org.openjfx:javafx-fxml:21
+org.openjfx:javafx-graphics:21
+
+# Font Icons:
+org.kordamp.ikonli:ikonli-core:12.3.1
+org.kordamp.ikonli:ikonli-javafx:12.3.1
+org.kordamp.ikonli:ikonli-fontawesome5-pack:12.3.1
+
+# Database Persistence & Connection Pooling:
+org.postgresql:postgresql:42.7.13
+com.zaxxer:HikariCP:7.1.0
+
+# Database Migrations:
+org.flywaydb:flyway-core:13.8.0
+org.flywaydb:flyway-database-postgresql:13.8.0
+
+# Security & Hashing:
+org.mindrot:jbcrypt:0.4
+
+# Automated Testing & Testcontainers:
+org.junit.jupiter:junit-jupiter:5.12.2
+org.testcontainers:testcontainers-bom:2.0.5
+org.testcontainers:testcontainers-junit-jupiter:2.0.5
+org.testcontainers:testcontainers-postgresql:2.0.5
+org.junit.platform:junit-platform-launcher
+
+
+# ------------------------------------------------------------------------------
+# 4. FRESH DEVICE QUICK-START COMMANDS
+# ------------------------------------------------------------------------------
+# 1. Start Database:
+#      docker compose up -d
+# 2. Compile:
+#      ./gradlew compileJava
+# 3. Run Integration Tests:
+#      ./gradlew test
+# 4. Launch Application UI:
+#      ./gradlew run
