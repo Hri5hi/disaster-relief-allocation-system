@@ -1,104 +1,76 @@
 package com.groupa13.disasterrelief.model;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Model for the 'volunteers' table (INHERITS people).
- * Schema: project_description_v2.md Table 8
+ * Schema: docs/3.3_relational_schema.md Relation 8
  *
- * Fields from people: person_id, name, contact, email
- * Volunteer-specific: skills (TEXT[]), availability (tsrange), assigned_zone (FK zones)
+ * Volunteer-specific columns:
+ *   skills       TEXT[]   -- PostgreSQL array; Java List<String>
+ *   availability TSRANGE  -- stored/displayed as a string literal
+ *   assigned_zone INTEGER -- FK → zones(zone_id), nullable
+ *
+ * JDBC binding:
+ *   skills: conn.createArrayOf("text", skills.toArray(new String[0]))
+ *   availability: PGobject with type "tsrange"
  */
-public class Volunteer {
+public class Volunteer extends Person {
 
-    private int personId;
-    private String name;
-    private String contact;
-    private String email;
-    private String skills;        // PostgreSQL TEXT[] displayed as comma-separated, e.g. "first_aid, driving"
-    private String availability;  // PostgreSQL tsrange displayed as string, e.g. "[2026-07-09 08:00, 2026-07-20 18:00)"
-    private Integer assignedZone; // FK → zones(zone_id), nullable
-    private String zoneName;      // Display-friendly zone name (joined from zones table)
+    /** Skill tags. PostgreSQL TEXT[]. JDBC: createArrayOf("text", ...) */
+    private List<String> skills;
+
+    /**
+     * Availability window as a tsrange literal string,
+     * e.g. "[2026-07-09 08:00, 2026-07-20 18:00)".
+     * Null or empty means not specified.
+     * JDBC: PGobject with type "tsrange"
+     */
+    private String availability;
+
+    /** FK → zones(zone_id). Nullable. */
+    private Integer assignedZone;
+
+    /** Display-friendly zone name (joined from zones, not a DB column). */
+    private String zoneName;
 
     public Volunteer() {
+        this.skills = new ArrayList<>();
     }
 
     public Volunteer(int personId, String name, String contact, String email,
-                     String skills, String availability, Integer assignedZone) {
-        this.personId = personId;
-        this.name = name;
-        this.contact = contact;
-        this.email = email;
-        this.skills = skills;
+                     List<String> skills, String availability, Integer assignedZone) {
+        super(personId, name, contact, email);
+        this.skills = skills != null ? skills : new ArrayList<>();
         this.availability = availability;
         this.assignedZone = assignedZone;
     }
 
     // --- Getters ---
 
-    public int getPersonId() {
-        return personId;
+    public List<String> getSkills() { return skills; }
+
+    /**
+     * Returns skills as a comma-separated string for JavaFX TableColumn display.
+     * PropertyValueFactory in the controller binds to "skillsDisplay".
+     */
+    public String getSkillsDisplay() {
+        return skills == null || skills.isEmpty() ? "" : String.join(", ", skills);
     }
 
-    public String getName() {
-        return name;
-    }
-
-    public String getContact() {
-        return contact;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public String getSkills() {
-        return skills;
-    }
-
-    public String getAvailability() {
-        return availability;
-    }
-
-    public Integer getAssignedZone() {
-        return assignedZone;
-    }
-
-    public String getZoneName() {
-        return zoneName;
-    }
+    public String getAvailability() { return availability; }
+    public Integer getAssignedZone() { return assignedZone; }
+    public String getZoneName() { return zoneName; }
 
     // --- Setters ---
 
-    public void setPersonId(int personId) {
-        this.personId = personId;
+    public void setSkills(List<String> skills) {
+        this.skills = skills != null ? skills : new ArrayList<>();
     }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public void setContact(String contact) {
-        this.contact = contact;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public void setSkills(String skills) {
-        this.skills = skills;
-    }
-
-    public void setAvailability(String availability) {
-        this.availability = availability;
-    }
-
-    public void setAssignedZone(Integer assignedZone) {
-        this.assignedZone = assignedZone;
-    }
-
-    public void setZoneName(String zoneName) {
-        this.zoneName = zoneName;
-    }
+    public void setAvailability(String availability) { this.availability = availability; }
+    public void setAssignedZone(Integer assignedZone) { this.assignedZone = assignedZone; }
+    public void setZoneName(String zoneName) { this.zoneName = zoneName; }
 
     @Override
     public String toString() {
