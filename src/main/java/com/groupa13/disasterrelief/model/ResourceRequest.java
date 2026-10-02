@@ -12,6 +12,7 @@ public class ResourceRequest {
     private int requestId;
     private int zoneId;
     private int resourceId;
+    private int destinationShelterId;
     private int quantityRequested;
     private String urgency;       // CHECK: 'critical', 'high', 'medium', 'low'
     private int priorityScore;    // Generated column — computed by DB
@@ -20,22 +21,31 @@ public class ResourceRequest {
     private String fulfilledAt;   // TIMESTAMPTZ, set by fn_allocate_resources()
     private String zoneName;      // Display-friendly (joined from zones)
     private String resourceName;  // Display-friendly (joined from resources)
+    private String destinationShelterName; // Display-friendly (joined from shelters)
 
     public ResourceRequest() {
     }
 
-    public ResourceRequest(int requestId, int zoneId, int resourceId, int quantityRequested,
-                           String urgency, int priorityScore, String status,
-                           String requestedAt, String fulfilledAt) {
+    public ResourceRequest(int requestId, int zoneId, int resourceId, int destinationShelterId,
+                           int quantityRequested, String urgency, int priorityScore,
+                           String status, String requestedAt, String fulfilledAt) {
         this.requestId = requestId;
         this.zoneId = zoneId;
         this.resourceId = resourceId;
+        this.destinationShelterId = destinationShelterId;
         this.quantityRequested = quantityRequested;
         this.urgency = urgency;
         this.priorityScore = priorityScore;
         this.status = status;
         this.requestedAt = requestedAt;
         this.fulfilledAt = fulfilledAt;
+    }
+
+    public ResourceRequest(int requestId, int zoneId, int resourceId, int quantityRequested,
+                           String urgency, int priorityScore, String status,
+                           String requestedAt, String fulfilledAt) {
+        this(requestId, zoneId, resourceId, 0, quantityRequested, urgency, priorityScore,
+             status, requestedAt, fulfilledAt);
     }
 
     // --- Getters ---
@@ -50,6 +60,10 @@ public class ResourceRequest {
 
     public int getResourceId() {
         return resourceId;
+    }
+
+    public int getDestinationShelterId() {
+        return destinationShelterId;
     }
 
     public int getQuantityRequested() {
@@ -84,6 +98,10 @@ public class ResourceRequest {
         return resourceName;
     }
 
+    public String getDestinationShelterName() {
+        return destinationShelterName;
+    }
+
     // --- Setters ---
 
     public void setRequestId(int requestId) {
@@ -96,6 +114,10 @@ public class ResourceRequest {
 
     public void setResourceId(int resourceId) {
         this.resourceId = resourceId;
+    }
+
+    public void setDestinationShelterId(int destinationShelterId) {
+        this.destinationShelterId = destinationShelterId;
     }
 
     public void setQuantityRequested(int quantityRequested) {
@@ -128,6 +150,10 @@ public class ResourceRequest {
 
     public void setResourceName(String resourceName) {
         this.resourceName = resourceName;
+    }
+
+    public void setDestinationShelterName(String destinationShelterName) {
+        this.destinationShelterName = destinationShelterName;
     }
 
     @Override

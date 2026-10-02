@@ -1,7 +1,17 @@
 package com.groupa13.disasterrelief.controller;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import com.groupa13.disasterrelief.model.core.EntityOption;
+import com.groupa13.disasterrelief.model.operations.DonationItem;
+import com.groupa13.disasterrelief.model.operations.DonationRecord;
+import com.groupa13.disasterrelief.service.core.ResourceService;
+import com.groupa13.disasterrelief.service.core.ServiceResult;
+import com.groupa13.disasterrelief.service.core.ShelterService;
+import com.groupa13.disasterrelief.service.operations.DonationService;
 import com.groupa13.disasterrelief.util.Utility;
 
 import javafx.beans.property.SimpleStringProperty;
@@ -20,10 +30,6 @@ import javafx.scene.control.cell.PropertyValueFactory;
 
 public class DonationController extends Utility {
 
-    // TODO: replace with com.groupa13.disasterrelief.model.DonationRecord once the model
-    // layer exists. Mirrors the `donation_records` table (donation_id, donor_name, items
-    // JSONB, received_at, receiving_shelter). itemsSummary is a display-only flattening of
-    // the JSONB array for the table; the DAO should serialize the real item list to JSONB.
     public static class DonationRow {
         private final StringProperty donationId;
         private final StringProperty donorName;
@@ -47,16 +53,18 @@ public class DonationController extends Utility {
         public String getReceivedAt() { return receivedAt.get(); }
     }
 
-    /** One line item in the donation being built — maps to a single {"resource_id","quantity"} entry. */
     public static class DonationItemRow {
+        private final int resourceId;
         private final StringProperty resource;
         private final StringProperty quantity;
 
-        public DonationItemRow(String resource, int quantity) {
+        public DonationItemRow(int resourceId, String resource, int quantity) {
+            this.resourceId = resourceId;
             this.resource = new SimpleStringProperty(resource);
             this.quantity = new SimpleStringProperty(String.valueOf(quantity));
         }
 
+        public int getResourceId() { return resourceId; }
         public String getResource() { return resource.get(); }
         public String getQuantity() { return quantity.get(); }
         public int getQuantityAsInt() { return Integer.parseInt(quantity.get()); }
@@ -83,6 +91,23 @@ public class DonationController extends Utility {
 
     private final ObservableList<DonationItemRow> currentItems = FXCollections.observableArrayList();
     private final ObservableList<DonationRow> donationHistory = FXCollections.observableArrayList();
+    private final Map<String, Integer> shelterNameToId = new HashMap<>();
+    private final Map<String, Integer> resourceNameToId = new HashMap<>();
+
+    private final DonationService donationService;
+    private final ShelterService shelterService;
+    private final ResourceService resourceService;
+
+    public DonationController() {
+        this(new DonationService(), new ShelterService(), new ResourceService());
+    }
+
+    public DonationController(DonationService donationService, ShelterService shelterService,
+            ResourceService resourceService) {
+        this.donationService = donationService;
+        this.shelterService = shelterService;
+        this.resourceService = resourceService;
+    }
 
     @FXML
     public void initialize() {
@@ -97,48 +122,69 @@ public class DonationController extends Utility {
         colReceivedAt.setCellValueFactory(new PropertyValueFactory<>("receivedAt"));
         donationTable.setItems(donationHistory);
 
-        loadShelterOptions();
-        loadResourceOptions();
-        loadDonationHistory();
+        loadOptionsAndHistory();
     }
 
-    private void loadShelterOptions() {
-        // TODO: replace with ShelterService.getAllShelters() -> SELECT shelter_id, name FROM shelters.
-        receivingShelterCombo.getItems().setAll(
-                "S2001 — Government School Hall, Meppadi",
-                "S2002 — Community Hall, Kalpetta");
-    }
-
-    private void loadResourceOptions() {
-        // TODO: replace with ResourceService.getAllResources() -> SELECT resource_id, name FROM resources.
-        itemResourceCombo.getItems().setAll(
-                "R3001 — Paracetamol 500mg",
-                "R3002 — 20L Water Drum");
-    }
-
-    private void loadDonationHistory() {
-        Task<List<DonationRow>> loadTask = new Task<>() {
+    private void loadOptionsAndHistory() {
+        Task<Void> task = new Task<>() {
             @Override
-            protected List<DonationRow> call() {
-                // TODO: replace with DonationService.getRecentDonations() -> SELECT * FROM
-                // donation_records ORDER BY received_at DESC. itemsSummary should be built by
-                // flattening the JSONB `items` column, e.g. via jsonb_array_elements in SQL
-                // or by parsing client-side after fetch.
-                return List.of(
-                        new DonationRow("DN4001", "Rotary Club of Kochi",
-                                "Government School Hall, Meppadi",
-                                "Paracetamol 500mg x100, 20L Water Drum x50", "2026-07-29 14:20")
-                );
+            protected Void call() {
+                ServiceResult<List<EntityOption>> shelters = shelterService.listShelterOptions();
+                if (shelters.success()) {
+                    for (EntityOption s : shelters.value()) {
+                        shelterNameToId.put("S" + s.id() + " — " + s.name(), s.id());
+                    }
+                }
+
+                ServiceResult<List<EntityOption>> resources = resourceService.listResourceOptions();
+                if (resources.success()) {
+                    for (EntityOption r : resources.value()) {
+                        resourceNameToId.put("R" + r.id() + " — " + r.name(), r.id());
+                    }
+                }
+                return null;
             }
         };
 
-        loadTask.setOnSucceeded(e -> donationHistory.setAll(loadTask.getValue()));
-        loadTask.setOnFailed(e -> {
-            errorLabel.setText("Failed to load donation history from database");
-            if (loadTask.getException() != null) {
-                loadTask.getException().printStackTrace();
+        task.setOnSucceeded(e -> {
+            receivingShelterCombo.getItems().setAll(shelterNameToId.keySet());
+            itemResourceCombo.getItems().setAll(resourceNameToId.keySet());
+            loadDonationHistory();
+        });
+
+        task.setOnFailed(e -> errorLabel.setText("Failed to load options"));
+
+        Thread thread = new Thread(task, "donation-options-loader");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private void loadDonationHistory() {
+        Task<ServiceResult<List<DonationRecord>>> loadTask = new Task<>() {
+            @Override
+            protected ServiceResult<List<DonationRecord>> call() {
+                return donationService.listDonations();
+            }
+        };
+
+        loadTask.setOnSucceeded(e -> {
+            ServiceResult<List<DonationRecord>> result = loadTask.getValue();
+            if (result != null && result.success()) {
+                List<DonationRow> rows = new ArrayList<>();
+                for (DonationRecord rec : result.value()) {
+                    rows.add(new DonationRow(
+                            "DN" + rec.donationId(),
+                            rec.donorName() == null ? "Anonymous" : rec.donorName(),
+                            rec.receivingShelterName() == null ? "Central Shelter" : rec.receivingShelterName(),
+                            rec.itemsJson(),
+                            rec.receivedAt()
+                    ));
+                }
+                donationHistory.setAll(rows);
             }
         });
+
+        loadTask.setOnFailed(e -> errorLabel.setText("Failed to load donation history"));
 
         Thread thread = new Thread(loadTask, "donation-history-loader");
         thread.setDaemon(true);
@@ -147,27 +193,32 @@ public class DonationController extends Utility {
 
     @FXML
     public void handleAddItem(ActionEvent event) {
-        String resource = itemResourceCombo.getValue();
-        if (resource == null) {
+        String resourceText = itemResourceCombo.getValue();
+        if (resourceText == null) {
             errorLabel.setText("Select a resource to add");
+            return;
+        }
+
+        Integer resId = resourceNameToId.get(resourceText);
+        if (resId == null) {
+            errorLabel.setText("Invalid resource selected");
             return;
         }
 
         int quantity;
         try {
-            quantity = Integer.parseInt(itemQuantityField.getText());
+            quantity = Integer.parseInt(itemQuantityField.getText().trim());
             if (quantity <= 0) {
                 errorLabel.setText("Quantity must be greater than zero");
                 return;
             }
         } catch (NumberFormatException nfe) {
-            errorLabel.setText("Quantity must be a number");
+            errorLabel.setText("Quantity must be a positive number");
             return;
         }
 
-        // Merge into an existing line for the same resource rather than adding a duplicate row.
         DonationItemRow existing = currentItems.stream()
-                .filter(item -> item.getResource().equals(resource))
+                .filter(item -> item.getResourceId() == resId)
                 .findFirst()
                 .orElse(null);
 
@@ -175,7 +226,7 @@ public class DonationController extends Utility {
             existing.setQuantity(existing.getQuantityAsInt() + quantity);
             itemsTable.refresh();
         } else {
-            currentItems.add(new DonationItemRow(resource, quantity));
+            currentItems.add(new DonationItemRow(resId, resourceText, quantity));
         }
 
         itemQuantityField.clear();
@@ -195,49 +246,57 @@ public class DonationController extends Utility {
 
     @FXML
     public void handleRecordDonation(ActionEvent event) {
-        try {
-            String donorName = donorNameField.getText();
-            if (donorName == null || donorName.isBlank()) {
-                errorLabel.setText("Donor name is required");
-                return;
-            }
-
-            String shelter = receivingShelterCombo.getValue();
-            if (shelter == null) {
-                errorLabel.setText("Select a receiving shelter");
-                return;
-            }
-
-            if (currentItems.isEmpty()) {
-                errorLabel.setText("Add at least one item before recording the donation");
-                return;
-            }
-
-            // TODO: call DonationService.recordDonation(donorName, shelterId, items) which
-            // should, in a single transaction:
-            //   1. INSERT INTO donation_records (donor_name, items, receiving_shelter)
-            //      VALUES (?, ?::jsonb, ?) RETURNING donation_id
-            //   2. For each item, UPSERT into shelter_inventory:
-            //      INSERT INTO shelter_inventory (shelter_id, resource_id, quantity)
-            //      VALUES (?, ?, ?) ON CONFLICT (shelter_id, resource_id)
-            //      DO UPDATE SET quantity = shelter_inventory.quantity + EXCLUDED.quantity,
-            //      last_updated = NOW()
-            // If any UPSERT drops a resulting quantity below reorder_level, trg_low_stock_alert
-            // will NOT fire here since this is an increase, not a decrease — noted for whoever
-            // implements the trigger, not a UI concern.
-
-            String donationId = "DN" + (4000 + donationHistory.size() + 1);
-            String itemsSummary = buildItemsSummary();
-
-            DonationRow row = new DonationRow(donationId, donorName, stripId(shelter), itemsSummary, "just now");
-            donationHistory.add(0, row);
-
-            handleClear(event);
-            errorLabel.setText("");
-        } catch (Exception e) {
-            errorLabel.setText("Could not record donation");
-            e.printStackTrace();
+        String donorName = donorNameField.getText();
+        if (donorName == null || donorName.isBlank()) {
+            donorName = "Anonymous";
         }
+
+        String shelterText = receivingShelterCombo.getValue();
+        if (shelterText == null) {
+            errorLabel.setText("Select a receiving shelter");
+            return;
+        }
+
+        Integer shelterId = shelterNameToId.get(shelterText);
+        if (shelterId == null) {
+            errorLabel.setText("Invalid shelter selected");
+            return;
+        }
+
+        if (currentItems.isEmpty()) {
+            errorLabel.setText("Add at least one item before recording the donation");
+            return;
+        }
+
+        List<DonationItem> itemsToRecord = new ArrayList<>();
+        for (DonationItemRow row : currentItems) {
+            itemsToRecord.add(new DonationItem(row.getResourceId(), row.getQuantityAsInt()));
+        }
+
+        final String finalDonor = donorName;
+        Task<ServiceResult<Integer>> task = new Task<>() {
+            @Override
+            protected ServiceResult<Integer> call() {
+                return donationService.processDonation(finalDonor, shelterId, itemsToRecord);
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            ServiceResult<Integer> result = task.getValue();
+            if (result != null && result.success()) {
+                showInfoAlert("Success", result.message());
+                handleClear(event);
+                loadDonationHistory();
+            } else {
+                errorLabel.setText(result != null ? result.message() : "Donation recording failed");
+            }
+        });
+
+        task.setOnFailed(e -> errorLabel.setText("Donation processing task failed"));
+
+        Thread thread = new Thread(task, "record-donation-worker");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     @FXML
@@ -254,25 +313,5 @@ public class DonationController extends Utility {
     @FXML
     public void goBack(ActionEvent event) {
         changeScene(event, "dashboard", "Dashboard");
-    }
-
-    private String buildItemsSummary() {
-        StringBuilder sb = new StringBuilder();
-        for (DonationItemRow item : currentItems) {
-            if (sb.length() > 0) {
-                sb.append(", ");
-            }
-            sb.append(stripId(item.getResource())).append(" x").append(item.getQuantity());
-        }
-        return sb.toString();
-    }
-
-    /** Strips the leading "ID — " prefix from a combo box entry, leaving just the display name. */
-    private String stripId(String comboEntry) {
-        if (comboEntry == null) {
-            return null;
-        }
-        int dashIndex = comboEntry.indexOf(" — ");
-        return dashIndex == -1 ? comboEntry : comboEntry.substring(dashIndex + 3);
     }
 }

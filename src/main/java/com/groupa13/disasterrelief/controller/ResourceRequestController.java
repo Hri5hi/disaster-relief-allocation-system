@@ -1,8 +1,22 @@
 package com.groupa13.disasterrelief.controller;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import com.groupa13.disasterrelief.model.ResourceRequest;
+import com.groupa13.disasterrelief.model.core.EntityOption;
+import com.groupa13.disasterrelief.model.core.Resource;
+import com.groupa13.disasterrelief.model.core.Shelter;
+import com.groupa13.disasterrelief.model.core.Zone;
+import com.groupa13.disasterrelief.model.operations.AllocationResult;
+import com.groupa13.disasterrelief.service.core.ResourceService;
+import com.groupa13.disasterrelief.service.core.ServiceResult;
+import com.groupa13.disasterrelief.service.core.ShelterService;
+import com.groupa13.disasterrelief.service.core.ZoneService;
+import com.groupa13.disasterrelief.service.operations.AllocationService;
+import com.groupa13.disasterrelief.service.operations.ResourceRequestService;
 import com.groupa13.disasterrelief.util.UserRole;
 import com.groupa13.disasterrelief.util.UserSession;
 import com.groupa13.disasterrelief.util.Utility;
@@ -18,24 +32,11 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.cell.PropertyValueFactory;
 
-/**
- * Controller for resource_request.fxml — Priority Request Submission & Fulfillment.
- * Target Roles: ZONE_COORDINATOR (submit), WAREHOUSE_MANAGER (fulfill), SYSTEM_ADMIN (all)
- *
- * Features:
- * - Submit resource requests with urgency levels → DB generates priority_score
- * - Fulfill button triggers fn_allocate_resources() atomic transfer
- * - Zone Coordinators: pre-filtered to their assigned zone
- * - Warehouse Managers: see fulfillment mode with Fulfill button
- * - Status filtering (pending/fulfilled/cancelled)
- *
- * Adapted from: Hostel-Management-System AllocationController.java pattern
- */
 public class ResourceRequestController extends Utility {
 
-    // --- Form fields ---
     @FXML private TextField requestIdField;
     @FXML private ComboBox<String> zoneCombo;
     @FXML private ComboBox<String> resourceCombo;
@@ -46,7 +47,6 @@ public class ResourceRequestController extends Utility {
     @FXML private Label errorLabel;
     @FXML private Label roleBadge;
 
-    // --- Table ---
     @FXML private TableView<ResourceRequest> requestTable;
     @FXML private TableColumn<ResourceRequest, Integer> colRequestId;
     @FXML private TableColumn<ResourceRequest, String> colZoneName;
@@ -58,12 +58,34 @@ public class ResourceRequestController extends Utility {
     @FXML private TableColumn<ResourceRequest, String> colRequestedAt;
     @FXML private TableColumn<ResourceRequest, String> colFulfilledAt;
 
-    private ObservableList<ResourceRequest> dataList = FXCollections.observableArrayList();
-    private ObservableList<ResourceRequest> searchList = FXCollections.observableArrayList();
+    private final ObservableList<ResourceRequest> dataList = FXCollections.observableArrayList();
+    private final Map<String, Integer> zoneNameToId = new HashMap<>();
+    private final Map<String, Integer> zoneNameToPrimaryShelter = new HashMap<>();
+    private final Map<String, Integer> resourceNameToId = new HashMap<>();
+
+    private final ResourceRequestService requestService;
+    private final AllocationService allocationService;
+    private final ZoneService zoneService;
+    private final ResourceService resourceService;
+    private final ShelterService shelterService;
+
+    public ResourceRequestController() {
+        this(new ResourceRequestService(), new AllocationService(), new ZoneService(),
+             new ResourceService(), new ShelterService());
+    }
+
+    public ResourceRequestController(ResourceRequestService requestService,
+            AllocationService allocationService, ZoneService zoneService,
+            ResourceService resourceService, ShelterService shelterService) {
+        this.requestService = requestService;
+        this.allocationService = allocationService;
+        this.zoneService = zoneService;
+        this.resourceService = resourceService;
+        this.shelterService = shelterService;
+    }
 
     @FXML
     public void initialize() {
-        // Bind table columns
         colRequestId.setCellValueFactory(new PropertyValueFactory<>("requestId"));
         colZoneName.setCellValueFactory(new PropertyValueFactory<>("zoneName"));
         colResourceName.setCellValueFactory(new PropertyValueFactory<>("resourceName"));
@@ -74,263 +96,308 @@ public class ResourceRequestController extends Utility {
         colRequestedAt.setCellValueFactory(new PropertyValueFactory<>("requestedAt"));
         colFulfilledAt.setCellValueFactory(new PropertyValueFactory<>("fulfilledAt"));
 
-        // Populate urgency combo with allowed CHECK values
-        urgencyCombo.getItems().addAll("critical", "high", "medium", "low");
+        urgencyCombo.getItems().setAll("critical", "high", "medium", "low");
         urgencyCombo.getSelectionModel().select("medium");
 
-        // Populate status combo for filtering
-        statusCombo.getItems().addAll("pending", "fulfilled", "cancelled");
+        statusCombo.getItems().setAll("All", "pending", "fulfilled", "cancelled");
         statusCombo.getSelectionModel().select("pending");
 
-        // Role-based UI adaptation:
-        // - ZONE_COORDINATOR: hide Fulfill button, pre-select zone
-        // - WAREHOUSE_MANAGER: show Fulfill button, hide Submit
-        // - SYSTEM_ADMIN: show all
-        // UserSession session = UserSession.getInstance();
-        // if (session.getRole() == UserRole.ZONE_COORDINATOR) {
-        //     btnFulfill.setVisible(false);
-        //     btnFulfill.setManaged(false);
-        //     // Pre-filter zone combo to assigned zone
-        // } else if (session.getRole() == UserRole.WAREHOUSE_MANAGER) {
-        //     // Show fulfillment mode
-        // }
+        UserSession session = UserSession.getInstance();
+        UserRole role = session.getRole();
+        if (roleBadge != null) {
+            roleBadge.setText(role != null ? role.getDisplayName() : "");
+        }
 
-        // TODO: Load zones and resources for combos from DB
-        // TODO: Load all requests asynchronously
-        /*
-        Task<Object[]> loadAllTask = new Task<>() {
+        if (role == UserRole.ZONE_COORDINATOR) {
+            btnFulfill.setVisible(false);
+            btnFulfill.setManaged(false);
+        }
+
+        requestTable.setItems(dataList);
+
+        requestTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSel, newSel) -> {
+            if (newSel != null) {
+                requestIdField.setText(String.valueOf(newSel.getRequestId()));
+                zoneCombo.setValue(newSel.getZoneName());
+                resourceCombo.setValue(newSel.getResourceName());
+                quantityField.setText(String.valueOf(newSel.getQuantityRequested()));
+                urgencyCombo.setValue(newSel.getUrgency());
+                statusCombo.setValue(newSel.getStatus());
+            }
+        });
+
+        loadReferenceDataAndRequests();
+    }
+
+    private void loadReferenceDataAndRequests() {
+        errorLabel.setText("Loading requests...");
+
+        Task<Void> task = new Task<>() {
             @Override
-            protected Object[] call() throws Exception {
-                List<ResourceRequest> requests = requestService.getAllRequests();
-                // Also load zones and resources for combos
-                return new Object[] { requests, zones, resources };
+            protected Void call() {
+                ServiceResult<List<Zone>> zResult = zoneService.listZones();
+                if (zResult.success()) {
+                    for (Zone z : zResult.value()) {
+                        zoneNameToId.put(z.name(), z.zoneId());
+                        if (z.primaryShelterId() != null) {
+                            zoneNameToPrimaryShelter.put(z.name(), z.primaryShelterId());
+                        }
+                    }
+                }
+
+                ServiceResult<List<Resource>> rResult = resourceService.listResources();
+                if (rResult.success()) {
+                    for (Resource r : rResult.value()) {
+                        resourceNameToId.put(r.name(), r.resourceId());
+                    }
+                }
+                return null;
             }
         };
 
-        loadAllTask.setOnSucceeded(e -> {
-            Object[] results = loadAllTask.getValue();
-            dataList.setAll((List<ResourceRequest>) results[0]);
-            requestTable.setItems(dataList);
+        task.setOnSucceeded(e -> {
+            zoneCombo.getItems().setAll(zoneNameToId.keySet());
+            resourceCombo.getItems().setAll(resourceNameToId.keySet());
+
+            UserSession session = UserSession.getInstance();
+            if (session.getRole() == UserRole.ZONE_COORDINATOR && session.getAssignedZoneId() != null) {
+                for (Map.Entry<String, Integer> entry : zoneNameToId.entrySet()) {
+                    if (entry.getValue().equals(session.getAssignedZoneId())) {
+                        zoneCombo.setValue(entry.getKey());
+                        zoneCombo.setDisable(true);
+                        break;
+                    }
+                }
+            }
+            refreshTableData();
         });
 
-        loadAllTask.setOnFailed(e -> {
-            errorLabel.setText("Failed to load requests from database");
-        });
+        task.setOnFailed(e -> errorLabel.setText("Failed to load reference data"));
 
-        Thread thread = new Thread(loadAllTask);
+        Thread thread = new Thread(task, "resource-req-loader");
         thread.setDaemon(true);
         thread.start();
-        */
-
-        requestTable.setItems(dataList);
     }
 
-    /**
-     * Submit a new resource request.
-     * The DB auto-generates the priority_score via a generated column.
-     */
+    private void refreshTableData() {
+        String status = statusCombo.getValue();
+        UserSession session = UserSession.getInstance();
+        Integer zoneFilter = (session.getRole() == UserRole.ZONE_COORDINATOR) ? session.getAssignedZoneId() : null;
+
+        Task<ServiceResult<List<ResourceRequest>>> task = new Task<>() {
+            @Override
+            protected ServiceResult<List<ResourceRequest>> call() {
+                return requestService.listRequests(zoneFilter, status);
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            ServiceResult<List<ResourceRequest>> result = task.getValue();
+            if (result != null && result.success()) {
+                dataList.setAll(result.value());
+                errorLabel.setText("");
+            } else {
+                errorLabel.setText(result != null ? result.message() : "Failed to load requests");
+            }
+        });
+
+        task.setOnFailed(e -> errorLabel.setText("Unable to connect to database"));
+
+        Thread thread = new Thread(task, "resource-req-refresh");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
     @FXML
     public void handleSubmitRequest(ActionEvent event) {
-        try {
-            errorLabel.setText("");
-            String zone = zoneCombo.getValue();
-            String resource = resourceCombo.getValue();
-            String quantityText = quantityField.getText();
-            String urgency = urgencyCombo.getValue();
+        String zoneName = zoneCombo.getValue();
+        String resourceName = resourceCombo.getValue();
+        String quantityText = quantityField.getText();
+        String urgency = urgencyCombo.getValue();
 
-            if (zone == null || resource == null) {
-                errorLabel.setText("Select both zone and resource");
-                return;
-            }
-            if (quantityText == null || quantityText.trim().isEmpty()) {
-                errorLabel.setText("Quantity is required");
-                return;
-            }
-
-            int quantity = Integer.parseInt(quantityText);
-            if (quantity <= 0) {
-                errorLabel.setText("Quantity must be positive");
-                return;
-            }
-
-            // TODO: Call service layer
-            // ResourceRequest rr = requestService.submitRequest(zoneId, resourceId, quantity, urgency);
-            // if (rr != null) {
-            //     dataList.add(0, rr);
-            //     requestTable.setItems(dataList);
-            // }
-
-            errorLabel.setText("TODO: Service layer integration pending");
-
-        } catch (NumberFormatException e) {
-            errorLabel.setText("Quantity must be a number");
-        } catch (Exception e) {
-            errorLabel.setText("Error submitting request");
-            e.printStackTrace();
+        if (zoneName == null || resourceName == null) {
+            errorLabel.setText("Select both zone and resource");
+            return;
         }
+
+        Integer zoneId = zoneNameToId.get(zoneName);
+        Integer resourceId = resourceNameToId.get(resourceName);
+        if (zoneId == null || resourceId == null) {
+            errorLabel.setText("Invalid zone or resource");
+            return;
+        }
+
+        int quantity;
+        try {
+            quantity = Integer.parseInt(quantityText.trim());
+        } catch (Exception e) {
+            errorLabel.setText("Quantity must be a positive number");
+            return;
+        }
+
+        Integer destShelter = zoneNameToPrimaryShelter.get(zoneName);
+        if (destShelter == null) {
+            destShelter = 1; // Fallback to primary camp
+        }
+
+        final int finalDestShelter = destShelter;
+        Task<ServiceResult<ResourceRequest>> task = new Task<>() {
+            @Override
+            protected ServiceResult<ResourceRequest> call() {
+                return requestService.submitRequest(zoneId, resourceId, finalDestShelter, quantity, urgency);
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            ServiceResult<ResourceRequest> result = task.getValue();
+            if (result != null && result.success()) {
+                showInfoAlert("Success", result.message());
+                handleClear(event);
+                refreshTableData();
+            } else {
+                errorLabel.setText(result != null ? result.message() : "Failed to submit request");
+            }
+        });
+
+        task.setOnFailed(e -> errorLabel.setText("Submission failed"));
+
+        Thread thread = new Thread(task, "submit-request-worker");
+        thread.setDaemon(true);
+        thread.start();
     }
 
-    /**
-     * Update an existing request (e.g., change urgency or quantity before fulfillment).
-     */
     @FXML
     public void handleUpdate(ActionEvent event) {
-        try {
-            errorLabel.setText("");
-            String requestIdText = requestIdField.getText();
-            if (requestIdText == null || requestIdText.trim().isEmpty()) {
-                errorLabel.setText("Request ID is required for update");
-                return;
-            }
-            int requestId = Integer.parseInt(requestIdText);
-
-            // TODO: Call service layer
-            errorLabel.setText("TODO: Service layer integration pending");
-
-        } catch (NumberFormatException e) {
-            errorLabel.setText("Request ID must be a number");
-        } catch (Exception e) {
-            errorLabel.setText("Error updating request");
-            e.printStackTrace();
-        }
+        // Refresh table data
+        refreshTableData();
     }
 
-    /**
-     * Fulfill a pending request.
-     * Calls fn_allocate_resources() which performs an ATOMIC transfer:
-     * 1. Deducts from source shelter inventory
-     * 2. Adds to destination shelter inventory
-     * 3. Logs to distribution_log
-     * 4. Updates request status to 'fulfilled'
-     * All within a single transaction — either everything succeeds or nothing changes.
-     */
     @FXML
     public void handleFulfill(ActionEvent event) {
-        try {
-            errorLabel.setText("");
-            String requestIdText = requestIdField.getText();
-            if (requestIdText == null || requestIdText.trim().isEmpty()) {
-                errorLabel.setText("Enter the Request ID to fulfill");
-                return;
-            }
-            int requestId = Integer.parseInt(requestIdText);
-
-            // TODO: Call service layer which invokes fn_allocate_resources()
-            // boolean success = requestService.fulfillRequest(requestId);
-            // if (success) {
-            //     // Refresh the request in the table
-            //     dataList.removeIf(r -> r.getRequestId() == requestId);
-            //     ResourceRequest updated = requestService.findRequestById(requestId);
-            //     dataList.add(0, updated);
-            //     requestTable.setItems(dataList);
-            //     showInfoAlert("Success", "Request #" + requestId + " fulfilled — atomic transfer complete");
-            // } else {
-            //     errorLabel.setText("Fulfillment failed — check inventory levels");
-            // }
-
-            errorLabel.setText("TODO: fn_allocate_resources() integration pending");
-
-        } catch (NumberFormatException e) {
-            errorLabel.setText("Request ID must be a number");
-        } catch (Exception e) {
-            errorLabel.setText("Error fulfilling request");
-            e.printStackTrace();
+        ResourceRequest selected = requestTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showWarningAlert("Selection Required", "Select a pending request to fulfill");
+            return;
         }
+
+        if (!"pending".equalsIgnoreCase(selected.getStatus())) {
+            showWarningAlert("Invalid Status", "Only pending requests can be fulfilled");
+            return;
+        }
+
+        TextInputDialog dialog = new TextInputDialog("1");
+        dialog.setTitle("Fulfill Resource Request #" + selected.getRequestId());
+        dialog.setHeaderText("Fulfill Request for " + selected.getQuantityRequested() + " " + selected.getResourceName());
+        dialog.setContentText("Enter Source Shelter ID:");
+
+        Optional<String> result = dialog.showAndWait();
+        if (result.isEmpty()) {
+            return;
+        }
+
+        int sourceShelterId;
+        try {
+            sourceShelterId = Integer.parseInt(result.get().trim());
+        } catch (Exception e) {
+            showErrorAlert("Invalid Input", "Source Shelter ID must be a positive integer");
+            return;
+        }
+
+        Task<ServiceResult<AllocationResult>> task = new Task<>() {
+            @Override
+            protected ServiceResult<AllocationResult> call() {
+                return allocationService.allocateResources(selected.getRequestId(), sourceShelterId);
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            ServiceResult<AllocationResult> allocResult = task.getValue();
+            if (allocResult != null && allocResult.success()) {
+                showInfoAlert("Fulfillment Complete", allocResult.message());
+                refreshTableData();
+            } else {
+                showErrorAlert("Fulfillment Failed", allocResult != null ? allocResult.message() : "Allocation error");
+            }
+        });
+
+        task.setOnFailed(e -> showErrorAlert("System Error", "Allocation task failed"));
+
+        Thread thread = new Thread(task, "allocation-worker");
+        thread.setDaemon(true);
+        thread.start();
     }
 
-    /**
-     * Cancel a pending request (sets status to 'cancelled').
-     */
     @FXML
     public void handleCancel(ActionEvent event) {
-        try {
-            errorLabel.setText("");
-            String requestIdText = requestIdField.getText();
-            if (requestIdText == null || requestIdText.trim().isEmpty()) {
-                errorLabel.setText("Request ID is required to cancel");
-                return;
-            }
-            int requestId = Integer.parseInt(requestIdText);
-
-            // TODO: Call service layer
-            errorLabel.setText("TODO: Service layer integration pending");
-
-        } catch (NumberFormatException e) {
-            errorLabel.setText("Request ID must be a number");
-        } catch (Exception e) {
-            errorLabel.setText("Error cancelling request");
-            e.printStackTrace();
+        ResourceRequest selected = requestTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            showWarningAlert("Selection Required", "Select a pending request to cancel");
+            return;
         }
+
+        Task<ServiceResult<Void>> task = new Task<>() {
+            @Override
+            protected ServiceResult<Void> call() {
+                return requestService.cancelRequest(selected.getRequestId());
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            ServiceResult<Void> res = task.getValue();
+            if (res != null && res.success()) {
+                showInfoAlert("Success", res.message());
+                refreshTableData();
+            } else {
+                errorLabel.setText(res != null ? res.message() : "Failed to cancel request");
+            }
+        });
+
+        task.setOnFailed(e -> errorLabel.setText("Cancel failed"));
+
+        Thread thread = new Thread(task, "cancel-request-worker");
+        thread.setDaemon(true);
+        thread.start();
     }
 
-    /**
-     * Find a request by its ID.
-     */
     @FXML
     public void handleFindById(ActionEvent event) {
+        String idText = requestIdField.getText();
+        if (idText == null || idText.isBlank()) {
+            errorLabel.setText("Enter a Request ID to search");
+            return;
+        }
+
+        int id;
         try {
-            errorLabel.setText("");
-            String requestIdText = requestIdField.getText();
-            if (requestIdText == null || requestIdText.trim().isEmpty()) {
-                errorLabel.setText("Enter Request ID to search");
-                requestTable.setItems(dataList);
+            id = Integer.parseInt(idText.trim());
+        } catch (Exception e) {
+            errorLabel.setText("Request ID must be an integer");
+            return;
+        }
+
+        for (ResourceRequest req : dataList) {
+            if (req.getRequestId() == id) {
+                requestTable.getSelectionModel().select(req);
+                requestTable.scrollTo(req);
+                errorLabel.setText("");
                 return;
             }
-            int requestId = Integer.parseInt(requestIdText);
-
-            // TODO: Call service layer
-            errorLabel.setText("TODO: Service layer integration pending");
-
-        } catch (NumberFormatException e) {
-            errorLabel.setText("Request ID must be a number");
-        } catch (Exception e) {
-            errorLabel.setText("Error finding request");
-            e.printStackTrace();
         }
+        errorLabel.setText("Request #" + id + " not found in current view");
     }
 
-    /**
-     * Filter requests by the selected status (pending/fulfilled/cancelled).
-     */
     @FXML
     public void handleFilterByStatus(ActionEvent event) {
-        try {
-            errorLabel.setText("");
-            String status = statusCombo.getValue();
-            if (status == null) {
-                errorLabel.setText("Select a status to filter by");
-                requestTable.setItems(dataList);
-                return;
-            }
-
-            // TODO: Call service layer
-            // List<ResourceRequest> filtered = requestService.findByStatus(status);
-            // searchList.clear();
-            // searchList.setAll(filtered);
-            // requestTable.setItems(searchList);
-
-            errorLabel.setText("TODO: Service layer integration pending");
-
-        } catch (Exception e) {
-            errorLabel.setText("Error filtering requests");
-            e.printStackTrace();
-        }
+        refreshTableData();
     }
 
     @FXML
     public void handleClear(ActionEvent event) {
         requestIdField.clear();
         quantityField.clear();
-        if (zoneCombo.getItems() != null && !zoneCombo.getItems().isEmpty()) {
-            zoneCombo.getSelectionModel().clearSelection();
-        }
-        if (resourceCombo.getItems() != null && !resourceCombo.getItems().isEmpty()) {
-            resourceCombo.getSelectionModel().clearSelection();
-        }
-        urgencyCombo.getSelectionModel().select("medium");
-        statusCombo.getSelectionModel().select("pending");
         errorLabel.setText("");
-        requestTable.setItems(dataList);
+        urgencyCombo.getSelectionModel().select("medium");
+        requestTable.getSelectionModel().clearSelection();
     }
 
     @FXML

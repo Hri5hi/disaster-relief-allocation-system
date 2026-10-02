@@ -1,8 +1,14 @@
 package com.groupa13.disasterrelief.controller;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import com.groupa13.disasterrelief.model.AuditLog;
+import com.groupa13.disasterrelief.service.core.ServiceResult;
+import com.groupa13.disasterrelief.service.operations.AuditLogService;
+import com.groupa13.disasterrelief.util.UserRole;
+import com.groupa13.disasterrelief.util.UserSession;
 import com.groupa13.disasterrelief.util.Utility;
 
 import javafx.collections.FXCollections;
@@ -18,22 +24,8 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.cell.PropertyValueFactory;
 
-/**
- * Controller for audit_log.fxml — System Mutation Audit Trail.
- * Target Role: SYSTEM_ADMIN only
- *
- * Features:
- * - Read-only viewer (table populated entirely by trg_audit_log trigger)
- * - Multi-criteria filtering: table name, operation, user, date range
- * - JSON diff viewer: displays old_values vs new_values side-by-side
- * - Search by specific log ID
- *
- * The audit_log table is never written to by Java application code.
- * All entries are created by database triggers on INSERT/UPDATE/DELETE.
- */
 public class AuditLogController extends Utility {
 
-    // --- Filter fields ---
     @FXML private ComboBox<String> tableNameCombo;
     @FXML private ComboBox<String> operationCombo;
     @FXML private TextField changedByField;
@@ -43,11 +35,9 @@ public class AuditLogController extends Utility {
     @FXML private Label errorLabel;
     @FXML private Label roleBadge;
 
-    // --- JSON Diff viewer ---
     @FXML private TextArea oldValuesArea;
     @FXML private TextArea newValuesArea;
 
-    // --- Table ---
     @FXML private TableView<AuditLog> auditTable;
     @FXML private TableColumn<AuditLog, Integer> colLogId;
     @FXML private TableColumn<AuditLog, String> colTableName;
@@ -57,12 +47,19 @@ public class AuditLogController extends Utility {
     @FXML private TableColumn<AuditLog, String> colOldValues;
     @FXML private TableColumn<AuditLog, String> colNewValues;
 
-    private ObservableList<AuditLog> dataList = FXCollections.observableArrayList();
-    private ObservableList<AuditLog> searchList = FXCollections.observableArrayList();
+    private final ObservableList<AuditLog> dataList = FXCollections.observableArrayList();
+    private final AuditLogService auditLogService;
+
+    public AuditLogController() {
+        this(new AuditLogService());
+    }
+
+    public AuditLogController(AuditLogService auditLogService) {
+        this.auditLogService = auditLogService;
+    }
 
     @FXML
     public void initialize() {
-        // Bind table columns
         colLogId.setCellValueFactory(new PropertyValueFactory<>("logId"));
         colTableName.setCellValueFactory(new PropertyValueFactory<>("tableName"));
         colOperation.setCellValueFactory(new PropertyValueFactory<>("operation"));
@@ -71,20 +68,22 @@ public class AuditLogController extends Utility {
         colOldValues.setCellValueFactory(new PropertyValueFactory<>("oldValues"));
         colNewValues.setCellValueFactory(new PropertyValueFactory<>("newValues"));
 
-        // Populate operation filter combo with possible values
-        operationCombo.getItems().addAll("INSERT", "UPDATE", "DELETE");
+        operationCombo.getItems().setAll("All", "INSERT", "UPDATE", "DELETE");
+        operationCombo.getSelectionModel().select("All");
 
-        // Populate table name combo with audited tables
-        // These are the critical tables that have audit triggers per project_description_v2.md
-        tableNameCombo.getItems().addAll(
-                "disasters", "zones", "shelters",
-                "resource_categories", "resources", "shelter_inventory",
-                "volunteers", "affected_persons",
-                "resource_requests", "distribution_log", "volunteer_shifts",
-                "donation_records"
+        tableNameCombo.getItems().setAll(
+                "All",
+                "disasters", "zones", "shelters", "resources",
+                "shelter_inventory", "volunteers", "affected_persons",
+                "resource_requests", "volunteer_shifts", "donation_records"
         );
+        tableNameCombo.getSelectionModel().select("All");
 
-        // Listen for table row selection to auto-populate JSON diff viewer
+        UserRole role = UserSession.getInstance().getRole();
+        if (roleBadge != null) {
+            roleBadge.setText(role != null ? role.getDisplayName() : "");
+        }
+
         auditTable.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null) {
                 oldValuesArea.setText(formatJson(newVal.getOldValues()));
@@ -95,127 +94,87 @@ public class AuditLogController extends Utility {
             }
         });
 
-        // Load all audit logs asynchronously
-        // TODO: Replace with actual DAO/Service call
-        /*
-        Task<List<AuditLog>> loadTask = new Task<>() {
+        auditTable.setItems(dataList);
+        loadLogs(null, null, null, null, null, null);
+    }
+
+    private void loadLogs(String tableName, String operation, String changedBy,
+            LocalDate from, LocalDate to, Integer logId) {
+        errorLabel.setText("Loading audit trail...");
+
+        Task<ServiceResult<List<AuditLog>>> task = new Task<>() {
             @Override
-            protected List<AuditLog> call() throws Exception {
-                return auditLogService.getAllLogs();
+            protected ServiceResult<List<AuditLog>> call() {
+                return auditLogService.filterLogs(tableName, operation, changedBy, from, to, logId);
             }
         };
 
-        loadTask.setOnSucceeded(e -> {
-            dataList.setAll(loadTask.getValue());
-            auditTable.setItems(dataList);
+        task.setOnSucceeded(e -> {
+            ServiceResult<List<AuditLog>> result = task.getValue();
+            if (result != null && result.success()) {
+                dataList.setAll(result.value());
+                errorLabel.setText("");
+            } else {
+                errorLabel.setText(result != null ? result.message() : "Failed to load audit logs");
+            }
         });
 
-        loadTask.setOnFailed(e -> {
-            Throwable ex = loadTask.getException();
-            ex.printStackTrace();
-            errorLabel.setText("Failed to load audit logs from database");
-        });
+        task.setOnFailed(e -> errorLabel.setText("Database connection failure"));
 
-        Thread thread = new Thread(loadTask);
+        Thread thread = new Thread(task, "audit-log-loader");
         thread.setDaemon(true);
         thread.start();
-        */
-
-        auditTable.setItems(dataList);
     }
 
-    /**
-     * Apply all active filters (table name, operation, user, date range).
-     * Builds a dynamic WHERE clause based on which filters are populated.
-     */
     @FXML
     public void handleApplyFilters(ActionEvent event) {
+        String tableName = tableNameCombo.getValue();
+        String operation = operationCombo.getValue();
+        String changedBy = changedByField.getText();
+        String fromText = dateFromField.getText();
+        String toText = dateToField.getText();
+
+        LocalDate from = null;
+        LocalDate to = null;
+
         try {
-            errorLabel.setText("");
-            String tableName = tableNameCombo.getValue();
-            String operation = operationCombo.getValue();
-            String changedBy = changedByField.getText();
-            String dateFrom = dateFromField.getText();
-            String dateTo = dateToField.getText();
-
-            // At least one filter should be set
-            if ((tableName == null || tableName.isEmpty()) &&
-                (operation == null || operation.isEmpty()) &&
-                (changedBy == null || changedBy.isEmpty()) &&
-                (dateFrom == null || dateFrom.isEmpty())) {
-                errorLabel.setText("Set at least one filter criterion");
-                return;
+            if (fromText != null && !fromText.isBlank()) {
+                from = LocalDate.parse(fromText.trim());
             }
-
-            // TODO: Call service layer with filter parameters
-            // List<AuditLog> filtered = auditLogService.filterLogs(tableName, operation, changedBy, dateFrom, dateTo);
-            // searchList.clear();
-            // searchList.setAll(filtered);
-            // auditTable.setItems(searchList);
-
-            errorLabel.setText("TODO: Multi-criteria filter integration pending");
-
-        } catch (Exception e) {
-            errorLabel.setText("Error applying filters");
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Find a specific audit log entry by its ID.
-     */
-    @FXML
-    public void handleFindById(ActionEvent event) {
-        try {
-            errorLabel.setText("");
-            String logIdText = logIdField.getText();
-            if (logIdText == null || logIdText.trim().isEmpty()) {
-                errorLabel.setText("Enter Log ID to search");
-                auditTable.setItems(dataList);
-                return;
+            if (toText != null && !toText.isBlank()) {
+                to = LocalDate.parse(toText.trim());
             }
-            int logId = Integer.parseInt(logIdText);
-
-            // TODO: Call service layer
-            // AuditLog log = auditLogService.findLogById(logId);
-            // if (log != null) {
-            //     searchList.clear();
-            //     searchList.add(log);
-            //     auditTable.setItems(searchList);
-            // } else {
-            //     errorLabel.setText("Audit log entry not found");
-            // }
-
-            errorLabel.setText("TODO: Service layer integration pending");
-
-        } catch (NumberFormatException e) {
-            errorLabel.setText("Log ID must be a number");
-        } catch (Exception e) {
-            errorLabel.setText("Error finding audit log entry");
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Display the JSON diff for the currently selected audit log entry.
-     * Shows old_values and new_values side-by-side in the diff viewer.
-     */
-    @FXML
-    public void handleShowDiff(ActionEvent event) {
-        AuditLog selected = auditTable.getSelectionModel().getSelectedItem();
-        if (selected == null) {
-            errorLabel.setText("Select a row from the table first");
+        } catch (DateTimeParseException e) {
+            errorLabel.setText("Date format must be yyyy-MM-dd");
             return;
         }
-        errorLabel.setText("");
-        oldValuesArea.setText(formatJson(selected.getOldValues()));
-        newValuesArea.setText(formatJson(selected.getNewValues()));
+
+        loadLogs(tableName, operation, changedBy, from, to, null);
+    }
+
+    @FXML
+    public void handleFindById(ActionEvent event) {
+        String logIdText = logIdField.getText();
+        if (logIdText == null || logIdText.isBlank()) {
+            errorLabel.setText("Enter Log ID to search");
+            return;
+        }
+
+        int logId;
+        try {
+            logId = Integer.parseInt(logIdText.trim());
+        } catch (NumberFormatException e) {
+            errorLabel.setText("Log ID must be an integer");
+            return;
+        }
+
+        loadLogs(null, null, null, null, null, logId);
     }
 
     @FXML
     public void handleClear(ActionEvent event) {
-        tableNameCombo.getSelectionModel().clearSelection();
-        operationCombo.getSelectionModel().clearSelection();
+        tableNameCombo.getSelectionModel().select("All");
+        operationCombo.getSelectionModel().select("All");
         changedByField.clear();
         dateFromField.clear();
         dateToField.clear();
@@ -223,7 +182,7 @@ public class AuditLogController extends Utility {
         oldValuesArea.clear();
         newValuesArea.clear();
         errorLabel.setText("");
-        auditTable.setItems(dataList);
+        loadLogs(null, null, null, null, null, null);
     }
 
     @FXML
@@ -231,57 +190,13 @@ public class AuditLogController extends Utility {
         changeScene(event, "dashboard", "Dashboard");
     }
 
-    /**
-     * Simple JSON pretty-printer for display in the diff viewer.
-     * Adds newlines after commas and colons for readability.
-     * A production version would use a proper JSON library.
-     */
-    private String formatJson(String json) {
-        if (json == null || json.trim().isEmpty()) {
-            return "(null — no data for this operation)";
+    private String formatJson(String rawJson) {
+        if (rawJson == null || rawJson.trim().isEmpty() || "null".equalsIgnoreCase(rawJson.trim())) {
+            return "(none)";
         }
-
-        // Basic pretty-print: add indentation
-        StringBuilder sb = new StringBuilder();
-        int indent = 0;
-        boolean inString = false;
-
-        for (char c : json.toCharArray()) {
-            if (c == '"' && (sb.length() == 0 || sb.charAt(sb.length() - 1) != '\\')) {
-                inString = !inString;
-                sb.append(c);
-            } else if (!inString) {
-                switch (c) {
-                    case '{':
-                    case '[':
-                        sb.append(c);
-                        sb.append('\n');
-                        indent++;
-                        sb.append("  ".repeat(indent));
-                        break;
-                    case '}':
-                    case ']':
-                        sb.append('\n');
-                        indent--;
-                        sb.append("  ".repeat(Math.max(0, indent)));
-                        sb.append(c);
-                        break;
-                    case ',':
-                        sb.append(c);
-                        sb.append('\n');
-                        sb.append("  ".repeat(indent));
-                        break;
-                    case ':':
-                        sb.append(c);
-                        sb.append(' ');
-                        break;
-                    default:
-                        sb.append(c);
-                }
-            } else {
-                sb.append(c);
-            }
-        }
-        return sb.toString();
+        return rawJson.replace("{", "{\n  ")
+                .replace("}", "\n}")
+                .replace(", \"", ",\n  \"")
+                .replace(",\"", ",\n  \"");
     }
 }

@@ -1,8 +1,14 @@
 package com.groupa13.disasterrelief.controller;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import com.groupa13.disasterrelief.model.DistributionLog;
+import com.groupa13.disasterrelief.service.core.ServiceResult;
+import com.groupa13.disasterrelief.service.operations.DistributionLogService;
+import com.groupa13.disasterrelief.util.UserRole;
+import com.groupa13.disasterrelief.util.UserSession;
 import com.groupa13.disasterrelief.util.Utility;
 
 import javafx.collections.FXCollections;
@@ -16,30 +22,14 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.cell.PropertyValueFactory;
 
-/**
- * Controller for distribution_log.fxml — Read-Only Resource Movement History.
- * Target Roles: WAREHOUSE_MANAGER, SYSTEM_ADMIN, ANALYTICS_USER
- *
- * Features:
- * - Read-only view (records created by fn_allocate_resources() during fulfillment)
- * - Date range filtering leverages PostgreSQL table partitioning (partition pruning)
- * - Search by log ID
- *
- * The distribution_log table is range-partitioned by distributed_at (monthly partitions),
- * so date range queries automatically benefit from partition pruning.
- *
- * Adapted from: Hostel-Management-System RoomController.java handleShowAvailable() pattern
- */
 public class DistributionLogController extends Utility {
 
-    // --- Filter fields ---
     @FXML private TextField dateFromField;
     @FXML private TextField dateToField;
     @FXML private TextField logIdField;
     @FXML private Label errorLabel;
     @FXML private Label roleBadge;
 
-    // --- Table ---
     @FXML private TableView<DistributionLog> logTable;
     @FXML private TableColumn<DistributionLog, Integer> colLogId;
     @FXML private TableColumn<DistributionLog, String> colSourceShelter;
@@ -48,12 +38,19 @@ public class DistributionLogController extends Utility {
     @FXML private TableColumn<DistributionLog, Integer> colQuantity;
     @FXML private TableColumn<DistributionLog, String> colDistributedAt;
 
-    private ObservableList<DistributionLog> dataList = FXCollections.observableArrayList();
-    private ObservableList<DistributionLog> searchList = FXCollections.observableArrayList();
+    private final ObservableList<DistributionLog> dataList = FXCollections.observableArrayList();
+    private final DistributionLogService distributionLogService;
+
+    public DistributionLogController() {
+        this(new DistributionLogService());
+    }
+
+    public DistributionLogController(DistributionLogService distributionLogService) {
+        this.distributionLogService = distributionLogService;
+    }
 
     @FXML
     public void initialize() {
-        // Bind table columns
         colLogId.setCellValueFactory(new PropertyValueFactory<>("logId"));
         colSourceShelter.setCellValueFactory(new PropertyValueFactory<>("sourceShelterName"));
         colDestShelter.setCellValueFactory(new PropertyValueFactory<>("destShelterName"));
@@ -61,116 +58,82 @@ public class DistributionLogController extends Utility {
         colQuantity.setCellValueFactory(new PropertyValueFactory<>("quantity"));
         colDistributedAt.setCellValueFactory(new PropertyValueFactory<>("distributedAt"));
 
-        // Load all distribution logs asynchronously
-        // TODO: Replace with actual DAO/Service call
-        /*
-        Task<List<DistributionLog>> loadTask = new Task<>() {
+        UserRole role = UserSession.getInstance().getRole();
+        if (roleBadge != null) {
+            roleBadge.setText(role != null ? role.getDisplayName() : "");
+        }
+
+        logTable.setItems(dataList);
+        loadLogs(null, null, null);
+    }
+
+    private void loadLogs(LocalDate fromDate, LocalDate toDate, Integer logId) {
+        errorLabel.setText("Loading distribution logs...");
+
+        Task<ServiceResult<List<DistributionLog>>> task = new Task<>() {
             @Override
-            protected List<DistributionLog> call() throws Exception {
-                return distributionLogService.getAllLogs();
+            protected ServiceResult<List<DistributionLog>> call() {
+                return distributionLogService.filterLogs(fromDate, toDate, logId);
             }
         };
 
-        loadTask.setOnSucceeded(e -> {
-            dataList.setAll(loadTask.getValue());
-            logTable.setItems(dataList);
+        task.setOnSucceeded(e -> {
+            ServiceResult<List<DistributionLog>> result = task.getValue();
+            if (result != null && result.success()) {
+                dataList.setAll(result.value());
+                errorLabel.setText("");
+            } else {
+                errorLabel.setText(result != null ? result.message() : "Failed to load logs");
+            }
         });
 
-        loadTask.setOnFailed(e -> {
-            Throwable ex = loadTask.getException();
-            ex.printStackTrace();
-            errorLabel.setText("Failed to load distribution logs from database");
-        });
+        task.setOnFailed(e -> errorLabel.setText("Database connection failure"));
 
-        Thread thread = new Thread(loadTask);
+        Thread thread = new Thread(task, "dist-log-loader");
         thread.setDaemon(true);
         thread.start();
-        */
-
-        logTable.setItems(dataList);
     }
 
-    /**
-     * Filter distribution logs by date range.
-     * Leverages PostgreSQL table partitioning — the query planner will
-     * prune partitions outside the requested date range.
-     * SQL: WHERE distributed_at >= ? AND distributed_at < ?
-     */
     @FXML
     public void handleFilterByDate(ActionEvent event) {
+        String fromText = dateFromField.getText();
+        String toText = dateToField.getText();
+
+        LocalDate from = null;
+        LocalDate to = null;
+
         try {
-            errorLabel.setText("");
-            String dateFrom = dateFromField.getText();
-            String dateTo = dateToField.getText();
-
-            if (dateFrom == null || dateFrom.trim().isEmpty() ||
-                dateTo == null || dateTo.trim().isEmpty()) {
-                errorLabel.setText("Both From and To dates are required");
-                return;
+            if (fromText != null && !fromText.isBlank()) {
+                from = LocalDate.parse(fromText.trim());
             }
-
-            // Basic date format validation
-            if (!dateFrom.matches("\\d{4}-\\d{2}-\\d{2}") || !dateTo.matches("\\d{4}-\\d{2}-\\d{2}")) {
-                errorLabel.setText("Date format must be yyyy-MM-dd");
-                return;
+            if (toText != null && !toText.isBlank()) {
+                to = LocalDate.parse(toText.trim());
             }
-
-            // TODO: Call service layer with date range
-            // List<DistributionLog> filtered = distributionLogService.getLogsByDateRange(dateFrom, dateTo);
-            // searchList.clear();
-            // searchList.setAll(filtered);
-            // logTable.setItems(searchList);
-
-            errorLabel.setText("TODO: Date range query with partition pruning pending");
-
-        } catch (Exception e) {
-            errorLabel.setText("Error filtering by date range");
-            e.printStackTrace();
+        } catch (DateTimeParseException e) {
+            errorLabel.setText("Date format must be yyyy-MM-dd");
+            return;
         }
+
+        loadLogs(from, to, null);
     }
 
-    /**
-     * Find a specific distribution log entry by its ID.
-     */
     @FXML
     public void handleFindById(ActionEvent event) {
-        try {
-            errorLabel.setText("");
-            String logIdText = logIdField.getText();
-            if (logIdText == null || logIdText.trim().isEmpty()) {
-                errorLabel.setText("Enter Log ID to search");
-                logTable.setItems(dataList);
-                return;
-            }
-            int logId = Integer.parseInt(logIdText);
-
-            // TODO: Call service layer
-            // DistributionLog log = distributionLogService.findLogById(logId);
-            // if (log != null) {
-            //     searchList.clear();
-            //     searchList.add(log);
-            //     logTable.setItems(searchList);
-            // } else {
-            //     errorLabel.setText("Log entry not found");
-            // }
-
-            errorLabel.setText("TODO: Service layer integration pending");
-
-        } catch (NumberFormatException e) {
-            errorLabel.setText("Log ID must be a number");
-        } catch (Exception e) {
-            errorLabel.setText("Error finding log entry");
-            e.printStackTrace();
+        String logIdText = logIdField.getText();
+        if (logIdText == null || logIdText.isBlank()) {
+            errorLabel.setText("Enter a Log ID to search");
+            return;
         }
-    }
 
-    /**
-     * Reset the table to show all distribution log entries.
-     */
-    @FXML
-    public void handleShowAll(ActionEvent event) {
-        logTable.setItems(dataList);
-        errorLabel.setText("");
+        int logId;
+        try {
+            logId = Integer.parseInt(logIdText.trim());
+        } catch (NumberFormatException e) {
+            errorLabel.setText("Log ID must be an integer");
+            return;
+        }
+
+        loadLogs(null, null, logId);
     }
 
     @FXML
@@ -179,7 +142,7 @@ public class DistributionLogController extends Utility {
         dateToField.clear();
         logIdField.clear();
         errorLabel.setText("");
-        logTable.setItems(dataList);
+        loadLogs(null, null, null);
     }
 
     @FXML

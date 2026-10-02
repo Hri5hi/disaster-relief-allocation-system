@@ -28,32 +28,46 @@ import javafx.stage.Stage;
  */
 public class Utility {
 
+    private static final java.util.Map<String, java.util.Set<UserRole>> SCREEN_PERMISSIONS = java.util.Map.ofEntries(
+            java.util.Map.entry("login", java.util.Set.of()),
+            java.util.Map.entry("dashboard", java.util.Set.of(UserRole.values())),
+            java.util.Map.entry("disaster", java.util.Set.of(UserRole.SYSTEM_ADMIN)),
+            java.util.Map.entry("zone", java.util.Set.of(UserRole.SYSTEM_ADMIN)),
+            java.util.Map.entry("shelter", java.util.Set.of(UserRole.SYSTEM_ADMIN, UserRole.ZONE_COORDINATOR, UserRole.ANALYTICS_USER)),
+            java.util.Map.entry("resource", java.util.Set.of(UserRole.SYSTEM_ADMIN)),
+            java.util.Map.entry("inventory", java.util.Set.of(UserRole.SYSTEM_ADMIN, UserRole.WAREHOUSE_MANAGER)),
+            java.util.Map.entry("resource_request", java.util.Set.of(UserRole.SYSTEM_ADMIN, UserRole.ZONE_COORDINATOR, UserRole.WAREHOUSE_MANAGER)),
+            java.util.Map.entry("distribution_log", java.util.Set.of(UserRole.SYSTEM_ADMIN, UserRole.WAREHOUSE_MANAGER, UserRole.ANALYTICS_USER)),
+            java.util.Map.entry("volunteer", java.util.Set.of(UserRole.SYSTEM_ADMIN, UserRole.VOLUNTEER_COORDINATOR)),
+            java.util.Map.entry("volunteer_shift", java.util.Set.of(UserRole.SYSTEM_ADMIN, UserRole.VOLUNTEER_COORDINATOR)),
+            java.util.Map.entry("affected_person", java.util.Set.of(UserRole.SYSTEM_ADMIN, UserRole.ZONE_COORDINATOR)),
+            java.util.Map.entry("donation", java.util.Set.of(UserRole.SYSTEM_ADMIN, UserRole.WAREHOUSE_MANAGER)),
+            java.util.Map.entry("analytics", java.util.Set.of(UserRole.SYSTEM_ADMIN, UserRole.ZONE_COORDINATOR, UserRole.ANALYTICS_USER)),
+            java.util.Map.entry("audit_log", java.util.Set.of(UserRole.SYSTEM_ADMIN))
+    );
+
     /**
-     * Navigate to a new FXML scene with optional RBAC enforcement.
+     * Navigate to a new FXML scene with central RBAC enforcement.
      *
-     * <p>If {@code allowedRoles} is non-empty and the current session role is
-     * not in that list, an "Access Denied" alert is shown and navigation is
-     * aborted — the user stays on the current screen.
-     *
-     * @param event        the action event whose source node supplies the Stage
-     * @param fxmlName     the bare FXML filename <em>without</em> extension
-     *                     (e.g. {@code "dashboard"}, {@code "shelter"})
-     * @param title        the window title to set on the Stage
-     * @param allowedRoles zero or more roles permitted to access this screen;
-     *                     pass none (varargs empty) to allow all roles
+     * <p>If {@code allowedRoles} is non-empty, it overrides the central screen map.
+     * Otherwise, permissions are looked up from the central map. If the current
+     * session role is not permitted, an "Access Denied" alert is shown and
+     * navigation is aborted.
      */
     public void changeScene(Event event, String fxmlName, String title,
                             UserRole... allowedRoles) {
 
         // ── RBAC Guard ─────────────────────────────────────────────────────
-        if (allowedRoles.length > 0) {
-            UserRole currentRole = UserSession.getInstance().getRole();
-            if (!Arrays.asList(allowedRoles).contains(currentRole)) {
-                showErrorAlert("Access Denied",
-                        "Your role (" + (currentRole == null ? "none" : currentRole.getDisplayName())
-                        + ") does not have permission to access this screen.");
-                return;
-            }
+        UserRole currentRole = UserSession.getInstance().getRole();
+        java.util.Set<UserRole> permitted = allowedRoles.length > 0
+                ? java.util.Set.of(allowedRoles)
+                : SCREEN_PERMISSIONS.getOrDefault(fxmlName, java.util.Set.of());
+
+        if (!permitted.isEmpty() && !permitted.contains(currentRole)) {
+            showErrorAlert("Access Denied",
+                    "Your role (" + (currentRole == null ? "none" : currentRole.getDisplayName())
+                    + ") does not have permission to access screen: " + fxmlName);
+            return;
         }
 
         // ── Scene Load ─────────────────────────────────────────────────────

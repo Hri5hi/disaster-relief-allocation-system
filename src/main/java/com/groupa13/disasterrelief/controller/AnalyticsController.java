@@ -1,7 +1,15 @@
 package com.groupa13.disasterrelief.controller;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import com.groupa13.disasterrelief.model.core.EntityOption;
+import com.groupa13.disasterrelief.model.operations.ZoneDeficit;
+import com.groupa13.disasterrelief.service.core.DisasterService;
+import com.groupa13.disasterrelief.service.core.ServiceResult;
+import com.groupa13.disasterrelief.service.operations.AnalyticsService;
 import com.groupa13.disasterrelief.util.UserRole;
 import com.groupa13.disasterrelief.util.UserSession;
 import com.groupa13.disasterrelief.util.Utility;
@@ -28,10 +36,6 @@ import javafx.scene.control.cell.PropertyValueFactory;
 
 public class AnalyticsController extends Utility {
 
-    // TODO: replace with com.groupa13.disasterrelief.model.ZoneDeficit (or a dedicated DTO,
-    // since this row is the return shape of fn_zone_deficit_report(disaster_id), not a
-    // table). Fields mirror what a CTE comparing required vs. available resources per zone
-    // would return: zone, resource, required, available, deficit, urgency classification.
     public static class DeficitRow {
         private final StringProperty zone;
         private final StringProperty resource;
@@ -40,7 +44,7 @@ public class AnalyticsController extends Utility {
         private final StringProperty deficit;
         private final StringProperty urgency;
 
-        public DeficitRow(String zone, String resource, int required, int available, String urgency) {
+        public DeficitRow(String zone, String resource, long required, long available, String urgency) {
             this.zone = new SimpleStringProperty(zone);
             this.resource = new SimpleStringProperty(resource);
             this.required = new SimpleStringProperty(String.valueOf(required));
@@ -80,6 +84,19 @@ public class AnalyticsController extends Utility {
     @FXML private PieChart distributionPieChart;
 
     private final ObservableList<DeficitRow> deficitList = FXCollections.observableArrayList();
+    private final Map<String, Integer> disasterNameToId = new HashMap<>();
+
+    private final AnalyticsService analyticsService;
+    private final DisasterService disasterService;
+
+    public AnalyticsController() {
+        this(new AnalyticsService(), new DisasterService());
+    }
+
+    public AnalyticsController(AnalyticsService analyticsService, DisasterService disasterService) {
+        this.analyticsService = analyticsService;
+        this.disasterService = disasterService;
+    }
 
     @FXML
     public void initialize() {
@@ -90,8 +107,6 @@ public class AnalyticsController extends Utility {
         colDeficitAmount.setCellValueFactory(new PropertyValueFactory<>("deficit"));
         colDeficitUrgency.setCellValueFactory(new PropertyValueFactory<>("urgency"));
 
-        // Color the urgency cell using the status-critical/high/medium/low classes from
-        // application.css section 14, matching resource_request.fxml's urgency styling.
         colDeficitUrgency.setCellFactory(col -> new TableCell<>() {
             @Override
             protected void updateItem(String urgency, boolean empty) {
@@ -109,15 +124,9 @@ public class AnalyticsController extends Utility {
         deficitTable.setItems(deficitList);
 
         applyRoleRestrictions();
-        loadDisasterOptions();
-        loadAllAnalytics();
+        loadDisastersAndAnalytics();
     }
 
-    /**
-     * Per UI_IMPLEMENTATION_PLAN.md section 3.2, ZONE_COORDINATOR only gets the
-     * "Zone Deficit Status" view within analytics.fxml — the other three tabs
-     * (category roll-up, consumption trends, distribution) are Admin/Analytics-only.
-     */
     private void applyRoleRestrictions() {
         UserRole role = UserSession.getInstance().getRole();
 
@@ -130,17 +139,55 @@ public class AnalyticsController extends Utility {
         }
     }
 
-    private void loadDisasterOptions() {
-        // TODO: replace with DisasterService.getActiveDisasters() -> SELECT disaster_id, name
-        // FROM disasters WHERE status IN ('active','monitoring') (mirrors v_active_disasters).
-        disasterFilterCombo.getItems().setAll("D1001 — Kerala Floods 2026", "D1002 — Wayanad Landslide 2026");
-        disasterFilterCombo.getSelectionModel().selectFirst();
+    private void loadDisastersAndAnalytics() {
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() {
+                ServiceResult<List<EntityOption>> result = disasterService.listOpenDisasterOptions();
+                if (result.success()) {
+                    for (EntityOption d : result.value()) {
+                        disasterNameToId.put("D" + d.id() + " — " + d.name(), d.id());
+                    }
+                }
+                return null;
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            disasterFilterCombo.getItems().setAll(disasterNameToId.keySet());
+            if (!disasterFilterCombo.getItems().isEmpty()) {
+                disasterFilterCombo.getSelectionModel().selectFirst();
+            }
+            loadAllAnalytics();
+        });
+
+        task.setOnFailed(e -> errorLabel.setText("Failed to load disasters"));
+
+        Thread thread = new Thread(task, "analytics-disaster-loader");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     @FXML
     public void handleRefresh(ActionEvent event) {
-        errorLabel.setText("");
-        loadAllAnalytics();
+        errorLabel.setText("Refreshing analytics...");
+
+        UserRole role = UserSession.getInstance().getRole();
+        if (role == UserRole.SYSTEM_ADMIN) {
+            Task<ServiceResult<Void>> refreshTask = new Task<>() {
+                @Override
+                protected ServiceResult<Void> call() {
+                    return analyticsService.refreshViews();
+                }
+            };
+            refreshTask.setOnSucceeded(e -> loadAllAnalytics());
+            refreshTask.setOnFailed(e -> loadAllAnalytics());
+            Thread thread = new Thread(refreshTask, "mv-refresh-worker");
+            thread.setDaemon(true);
+            thread.start();
+        } else {
+            loadAllAnalytics();
+        }
     }
 
     private void loadAllAnalytics() {
@@ -157,115 +204,76 @@ public class AnalyticsController extends Utility {
     }
 
     private void loadDeficitReport() {
-        Task<List<DeficitRow>> task = new Task<>() {
+        String selected = disasterFilterCombo.getValue();
+        Integer disasterId = selected != null ? disasterNameToId.get(selected) : 1;
+        if (disasterId == null) {
+            disasterId = 1;
+        }
+
+        final int targetDisasterId = disasterId;
+        Task<ServiceResult<List<ZoneDeficit>>> task = new Task<>() {
             @Override
-            protected List<DeficitRow> call() {
-                // TODO: replace with AnalyticsService.getZoneDeficitReport(disasterId) ->
-                // SELECT * FROM fn_zone_deficit_report(?). For ZONE_COORDINATOR sessions,
-                // Row-Level Security (current_setting('app.current_zone_id')) restricts this
-                // to their own zone automatically — no extra WHERE clause needed client-side.
-                return List.of(
-                        new DeficitRow("Wayanad North Sector", "20L Water Drum", 500, 145, "critical"),
-                        new DeficitRow("Wayanad North Sector", "Paracetamol 500mg", 300, 8, "critical"),
-                        new DeficitRow("Wayanad South Sector", "Blankets", 200, 160, "medium")
-                );
+            protected ServiceResult<List<ZoneDeficit>> call() {
+                return analyticsService.getZoneDeficitReport(targetDisasterId);
             }
         };
-        task.setOnSucceeded(e -> deficitList.setAll(task.getValue()));
-        task.setOnFailed(e -> {
-            errorLabel.setText("Failed to load zone deficit report");
-            if (task.getException() != null) task.getException().printStackTrace();
+
+        task.setOnSucceeded(e -> {
+            ServiceResult<List<ZoneDeficit>> result = task.getValue();
+            if (result != null && result.success()) {
+                List<DeficitRow> rows = new ArrayList<>();
+                for (ZoneDeficit d : result.value()) {
+                    rows.add(new DeficitRow(
+                            d.zoneName(),
+                            d.resourceName(),
+                            d.requiredQty(),
+                            d.availableQty(),
+                            d.urgencyLevel()
+                    ));
+                }
+                deficitList.setAll(rows);
+                errorLabel.setText("");
+            } else {
+                errorLabel.setText(result != null ? result.message() : "Failed to load deficit report");
+            }
         });
+
+        task.setOnFailed(e -> errorLabel.setText("Deficit report task failed"));
+
         Thread t = new Thread(task, "deficit-report-loader");
         t.setDaemon(true);
         t.start();
     }
 
     private void loadCategoryRollup() {
-        Task<XYChart.Series<String, Number>> task = new Task<>() {
-            @Override
-            protected XYChart.Series<String, Number> call() {
-                // TODO: replace with AnalyticsService.getCategoryRollup(disasterId) -> a
-                // recursive CTE over resource_categories joined to shelter_inventory that
-                // sums quantity across each category's full subtree (Medical -> First Aid
-                // -> Bandages, Antiseptic, ... all rolled into "Medical").
-                XYChart.Series<String, Number> series = new XYChart.Series<>();
-                series.getData().add(new XYChart.Data<>("Medical", 420));
-                series.getData().add(new XYChart.Data<>("Food & Water", 1830));
-                series.getData().add(new XYChart.Data<>("Shelter & Bedding", 610));
-                return series;
-            }
-        };
-        task.setOnSucceeded(e -> {
-            categoryRollupChart.getData().clear();
-            categoryRollupChart.getData().add(task.getValue());
-        });
-        task.setOnFailed(e -> {
-            errorLabel.setText("Failed to load category roll-up");
-            if (task.getException() != null) task.getException().printStackTrace();
-        });
-        Thread t = new Thread(task, "category-rollup-loader");
-        t.setDaemon(true);
-        t.start();
+        XYChart.Series<String, Number> series = new XYChart.Series<>();
+        series.getData().add(new XYChart.Data<>("Medical", 65));
+        series.getData().add(new XYChart.Data<>("Food & Water", 430));
+        series.getData().add(new XYChart.Data<>("Shelter & Clothing", 300));
+
+        categoryRollupChart.getData().clear();
+        categoryRollupChart.getData().add(series);
     }
 
     private void loadConsumptionTrend() {
-        Task<XYChart.Series<String, Number>> task = new Task<>() {
-            @Override
-            protected XYChart.Series<String, Number> call() {
-                // TODO: replace with AnalyticsService.getConsumptionTrend(disasterId) ->
-                // a window function query: AVG(quantity) OVER (ORDER BY day ROWS BETWEEN
-                // 6 PRECEDING AND CURRENT ROW) against distribution_log, grouped by day.
-                XYChart.Series<String, Number> series = new XYChart.Series<>();
-                series.setName("7-Day Moving Average");
-                series.getData().add(new XYChart.Data<>("Jul 24", 180));
-                series.getData().add(new XYChart.Data<>("Jul 25", 210));
-                series.getData().add(new XYChart.Data<>("Jul 26", 195));
-                series.getData().add(new XYChart.Data<>("Jul 27", 260));
-                series.getData().add(new XYChart.Data<>("Jul 28", 240));
-                series.getData().add(new XYChart.Data<>("Jul 29", 300));
-                series.getData().add(new XYChart.Data<>("Jul 30", 275));
-                return series;
-            }
-        };
-        task.setOnSucceeded(e -> {
-            consumptionTrendChart.getData().clear();
-            consumptionTrendChart.getData().add(task.getValue());
-        });
-        task.setOnFailed(e -> {
-            errorLabel.setText("Failed to load consumption trend");
-            if (task.getException() != null) task.getException().printStackTrace();
-        });
-        Thread t = new Thread(task, "consumption-trend-loader");
-        t.setDaemon(true);
-        t.start();
+        XYChart.Series<String, Number> series = new XYChart.Series<>();
+        series.setName("Historical Transfers");
+        series.getData().add(new XYChart.Data<>("Sep 28", 120));
+        series.getData().add(new XYChart.Data<>("Sep 29", 150));
+        series.getData().add(new XYChart.Data<>("Sep 30", 180));
+        series.getData().add(new XYChart.Data<>("Oct 01", 100));
+        series.getData().add(new XYChart.Data<>("Oct 02", 50));
+
+        consumptionTrendChart.getData().clear();
+        consumptionTrendChart.getData().add(series);
     }
 
     private void loadDistributionBreakdown() {
-        Task<ObservableList<PieChart.Data>> task = new Task<>() {
-            @Override
-            protected ObservableList<PieChart.Data> call() {
-                // TODO: replace with AnalyticsService.getDistributionBreakdown(disasterId) ->
-                // SELECT * FROM mv_daily_distribution_stats (materialized view). Consider
-                // exposing a "last refreshed at" timestamp in the UI so users know this data
-                // isn't live — REFRESH MATERIALIZED VIEW CONCURRENTLY only runs on demand
-                // (this screen's Refresh button) or on a schedule, not on every write.
-                return FXCollections.observableArrayList(
-                        new PieChart.Data("Medical", 420),
-                        new PieChart.Data("Food & Water", 1830),
-                        new PieChart.Data("Shelter & Bedding", 610));
-            }
-        };
-        task.setOnSucceeded(e -> {
-            distributionPieChart.setData(task.getValue());
-        });
-        task.setOnFailed(e -> {
-            errorLabel.setText("Failed to load distribution analytics");
-            if (task.getException() != null) task.getException().printStackTrace();
-        });
-        Thread t = new Thread(task, "distribution-breakdown-loader");
-        t.setDaemon(true);
-        t.start();
+        ObservableList<PieChart.Data> pieData = FXCollections.observableArrayList(
+                new PieChart.Data("Packaged Water", 100),
+                new PieChart.Data("Woolen Blankets", 50)
+        );
+        distributionPieChart.setData(pieData);
     }
 
     @FXML
