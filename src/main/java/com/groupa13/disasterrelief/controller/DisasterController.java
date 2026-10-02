@@ -2,12 +2,19 @@ package com.groupa13.disasterrelief.controller;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-import com.groupa13.disasterrelief.util.UserRole;
+import com.groupa13.disasterrelief.model.core.Disaster;
+import com.groupa13.disasterrelief.model.core.DisasterStatus;
+import com.groupa13.disasterrelief.model.core.Severity;
+import com.groupa13.disasterrelief.service.core.DisasterService;
+import com.groupa13.disasterrelief.service.core.ServiceResult;
 import com.groupa13.disasterrelief.util.Utility;
 
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.property.StringProperty;
+import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
@@ -22,230 +29,132 @@ import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
-import javafx.scene.control.cell.PropertyValueFactory;
 
 public class DisasterController extends Utility {
 
-    // TODO: replace with com.groupa13.disasterrelief.model.Disaster once the model
-    // layer exists. Field names below mirror the `disasters` table from
-    // project_description_v2.md (disaster_id, name, type, severity, active_period,
-    // status) with activePeriod pre-formatted for display.
-    public static class DisasterRow {
-        private final StringProperty disasterId;
-        private final StringProperty name;
-        private final StringProperty type;
-        private final StringProperty severity;
-        private final StringProperty activePeriod;
-        private final StringProperty status;
-
-        public DisasterRow(String disasterId, String name, String type, String severity,
-                String activePeriod, String status) {
-            this.disasterId = new SimpleStringProperty(disasterId);
-            this.name = new SimpleStringProperty(name);
-            this.type = new SimpleStringProperty(type);
-            this.severity = new SimpleStringProperty(severity);
-            this.activePeriod = new SimpleStringProperty(activePeriod);
-            this.status = new SimpleStringProperty(status);
-        }
-
-        public String getDisasterId() { return disasterId.get(); }
-        public String getName() { return name.get(); }
-        public String getType() { return type.get(); }
-        public String getSeverity() { return severity.get(); }
-        public String getActivePeriod() { return activePeriod.get(); }
-        public String getStatus() { return status.get(); }
-    }
+    private static final Logger LOGGER = Logger.getLogger(DisasterController.class.getName());
 
     @FXML private TextField disasterIdField;
     @FXML private TextField nameField;
     @FXML private ComboBox<String> typeCombo;
-    @FXML private ComboBox<String> severityCombo;
+    @FXML private ComboBox<Severity> severityCombo;
     @FXML private DatePicker activePeriodStartPicker;
     @FXML private DatePicker activePeriodEndPicker;
-    @FXML private ComboBox<String> statusCombo;
+    @FXML private ComboBox<DisasterStatus> statusCombo;
     @FXML private Label errorLabel;
 
-    @FXML private TableView<DisasterRow> disasterTable;
-    @FXML private TableColumn<DisasterRow, String> colDisasterId;
-    @FXML private TableColumn<DisasterRow, String> colName;
-    @FXML private TableColumn<DisasterRow, String> colType;
-    @FXML private TableColumn<DisasterRow, String> colSeverity;
-    @FXML private TableColumn<DisasterRow, String> colActivePeriod;
-    @FXML private TableColumn<DisasterRow, String> colStatus;
+    @FXML private TableView<Disaster> disasterTable;
+    @FXML private TableColumn<Disaster, String> colDisasterId;
+    @FXML private TableColumn<Disaster, String> colName;
+    @FXML private TableColumn<Disaster, String> colType;
+    @FXML private TableColumn<Disaster, String> colSeverity;
+    @FXML private TableColumn<Disaster, String> colActivePeriod;
+    @FXML private TableColumn<Disaster, String> colStatus;
 
-    private final ObservableList<DisasterRow> dataList = FXCollections.observableArrayList();
-    private final ObservableList<DisasterRow> searchList = FXCollections.observableArrayList();
+    private final ObservableList<Disaster> dataList = FXCollections.observableArrayList();
+    private final DisasterService disasterService;
+
+    public DisasterController() {
+        this(new DisasterService());
+    }
+
+    DisasterController(DisasterService disasterService) {
+        this.disasterService = disasterService;
+    }
 
     @FXML
     public void initialize() {
-        typeCombo.getItems().addAll("Flood", "Earthquake", "Cyclone", "Landslide", "Other");
-        severityCombo.getItems().addAll("low", "medium", "high", "critical");
-        statusCombo.getItems().addAll("active", "monitoring", "resolved", "closed");
+        typeCombo.getItems().setAll("Flood", "Earthquake", "Cyclone", "Landslide", "Other");
+        severityCombo.getItems().setAll(Severity.values());
+        statusCombo.getItems().setAll(DisasterStatus.values());
         typeCombo.getSelectionModel().selectFirst();
         severityCombo.getSelectionModel().selectFirst();
         statusCombo.getSelectionModel().selectFirst();
 
-        colDisasterId.setCellValueFactory(new PropertyValueFactory<>("disasterId"));
-        colName.setCellValueFactory(new PropertyValueFactory<>("name"));
-        colType.setCellValueFactory(new PropertyValueFactory<>("type"));
-        colSeverity.setCellValueFactory(new PropertyValueFactory<>("severity"));
-        colActivePeriod.setCellValueFactory(new PropertyValueFactory<>("activePeriod"));
-        colStatus.setCellValueFactory(new PropertyValueFactory<>("status"));
-
+        colDisasterId.setCellValueFactory(cell ->
+                new ReadOnlyStringWrapper("D" + cell.getValue().disasterId()));
+        colName.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().name()));
+        colType.setCellValueFactory(cell -> new ReadOnlyStringWrapper(
+                cell.getValue().type() == null ? "—" : cell.getValue().type()));
+        colSeverity.setCellValueFactory(cell ->
+                new ReadOnlyStringWrapper(cell.getValue().severity().toString()));
+        colActivePeriod.setCellValueFactory(cell -> new ReadOnlyStringWrapper(
+                cell.getValue().activePeriod() == null
+                        ? "—" : cell.getValue().activePeriod().displayValue()));
+        colStatus.setCellValueFactory(cell ->
+                new ReadOnlyStringWrapper(cell.getValue().status().toString()));
+        disasterTable.setItems(dataList);
+        disasterTable.getSelectionModel().selectedItemProperty().addListener(
+                (ignored, previous, selected) -> populateForm(selected));
         loadDisasters();
     }
 
     private void loadDisasters() {
-        Task<List<DisasterRow>> loadTask = new Task<>() {
-            @Override
-            protected List<DisasterRow> call() {
-                // TODO: replace with DisasterService.getAllDisasters() -> SELECT * FROM disasters
-                // (or v_active_disasters for the active-only subset).
-                return List.of(
-                        new DisasterRow("D1001", "Kerala Floods 2026", "Flood", "critical",
-                                "2026-07-01 → 2026-07-15", "active"),
-                        new DisasterRow("D1002", "Wayanad Landslide 2026", "Landslide", "high",
-                                "2026-06-10 → 2026-06-25", "monitoring")
-                );
-            }
-        };
-
-        loadTask.setOnSucceeded(e -> {
-            dataList.setAll(loadTask.getValue());
+        runServiceTask(disasterService::listDisasters, disasters -> {
+            dataList.setAll(disasters);
             disasterTable.setItems(dataList);
-        });
-
-        loadTask.setOnFailed(e -> {
-            errorLabel.setText("Failed to load disasters from database");
-            if (loadTask.getException() != null) {
-                loadTask.getException().printStackTrace();
-            }
-        });
-
-        Thread thread = new Thread(loadTask, "disaster-loader");
-        thread.setDaemon(true);
-        thread.start();
+        }, "disaster-loader");
     }
 
     @FXML
     public void handleAdd(ActionEvent event) {
-        try {
-            String name = nameField.getText();
-            if (name == null || name.isBlank()) {
-                errorLabel.setText("Disaster name is required");
-                return;
-            }
-
-            String type = typeCombo.getValue();
-            String severity = severityCombo.getValue();
-            String status = statusCombo.getValue();
-            String periodText = formatActivePeriod();
-
-            // TODO: call DisasterService.registerDisaster(name, type, severity,
-            // activePeriodStart, activePeriodEnd, status) -> INSERT INTO disasters (...)
-            // and use the SERIAL disaster_id returned instead of a client-generated one.
-            String disasterId = disasterIdField.getText().isBlank()
-                    ? "D" + (1000 + dataList.size() + 1)
-                    : disasterIdField.getText();
-
-            DisasterRow row = new DisasterRow(disasterId, name, type, severity, periodText, status);
-            dataList.add(0, row);
-            disasterTable.setItems(dataList);
-            errorLabel.setText("");
-        } catch (Exception e) {
-            errorLabel.setText("Could not add disaster");
-            e.printStackTrace();
+        if (!validForm()) {
+            return;
         }
+        runServiceTask(() -> disasterService.createDisaster(
+                nameField.getText(), typeCombo.getValue(), severityCombo.getValue(),
+                activePeriodStartPicker.getValue(), activePeriodEndPicker.getValue(),
+                statusCombo.getValue()), ignored -> {
+                    handleClear(null);
+                    loadDisasters();
+                }, "disaster-create");
     }
 
     @FXML
     public void handleUpdate(ActionEvent event) {
-        try {
-            String disasterId = disasterIdField.getText();
-            if (disasterId == null || disasterId.isBlank()) {
-                errorLabel.setText("Invalid disaster ID");
+        Integer disasterId = readId(disasterIdField.getText(), 'D', "Invalid disaster ID");
+        if (disasterId == null || !validForm()) {
+            return;
+        }
+        DisasterStatus status = statusCombo.getValue();
+        if (status == DisasterStatus.RESOLVED || status == DisasterStatus.CLOSED) {
+            Alert confirmation = new Alert(AlertType.CONFIRMATION);
+            confirmation.setTitle("Confirm Status Change");
+            confirmation.setHeaderText("Mark this disaster as " + status);
+            confirmation.setContentText(
+                    "Pending requests may be cancelled by the operations trigger. Continue?");
+            if (confirmation.showAndWait().filter(ButtonType.OK::equals).isEmpty()) {
                 return;
             }
-
-            String status = statusCombo.getValue();
-
-            if ("resolved".equals(status) || "closed".equals(status)) {
-                Alert confirm = new Alert(AlertType.CONFIRMATION);
-                confirm.setTitle("Confirm Status Change");
-                confirm.setHeaderText("Marking this disaster as \"" + status + "\"");
-                confirm.setContentText(
-                        "This will automatically cancel any still-pending resource requests "
-                                + "for all zones under this disaster (trg_cascade_disaster_close). "
-                                + "This action cannot be undone from the UI. Continue?");
-                var result = confirm.showAndWait();
-                if (result.isEmpty() || result.get() != ButtonType.OK) {
-                    errorLabel.setText("Status change cancelled");
-                    return;
-                }
-            }
-
-            // TODO: call DisasterService.updateDisaster(disasterId, name, type, severity,
-            // activePeriodStart, activePeriodEnd, status) -> UPDATE disasters SET ... WHERE disaster_id = ?
-            // The resolve/close cascade itself happens inside trg_cascade_disaster_close —
-            // the UI only needs to warn the admin before triggering it, not replicate the logic.
-
-            errorLabel.setText("");
-            loadDisasters();
-        } catch (Exception e) {
-            errorLabel.setText("Could not update disaster");
-            e.printStackTrace();
         }
+        runServiceTask(() -> disasterService.updateDisaster(
+                disasterId, nameField.getText(), typeCombo.getValue(), severityCombo.getValue(),
+                activePeriodStartPicker.getValue(), activePeriodEndPicker.getValue(), status),
+                ignored -> loadDisasters(), "disaster-update");
     }
 
     @FXML
     public void handleDelete(ActionEvent event) {
-        try {
-            String disasterId = disasterIdField.getText();
-            if (disasterId == null || disasterId.isBlank()) {
-                errorLabel.setText("Invalid disaster ID");
-                return;
-            }
-
-            // TODO: call DisasterService.deleteDisaster(disasterId) -> DELETE FROM disasters
-            // WHERE disaster_id = ?. Confirm whether deletes should even be allowed once a
-            // disaster has zones/requests attached, or whether "closed" status should be
-            // the only terminal state (deletion may violate FK constraints by design).
-            dataList.removeIf(d -> d.getDisasterId().equals(disasterId));
-            disasterTable.setItems(dataList);
-            errorLabel.setText("");
-        } catch (Exception e) {
-            errorLabel.setText("Could not delete disaster");
-            e.printStackTrace();
+        Integer disasterId = readId(disasterIdField.getText(), 'D', "Invalid disaster ID");
+        if (disasterId == null) {
+            return;
         }
+        runServiceTask(() -> disasterService.deleteDisaster(disasterId), ignored -> {
+            handleClear(null);
+            loadDisasters();
+        }, "disaster-delete");
     }
 
     @FXML
     public void handleFind(ActionEvent event) {
-        try {
-            String disasterId = disasterIdField.getText();
-            if (disasterId == null || disasterId.isBlank()) {
-                errorLabel.setText("Invalid disaster ID");
-                return;
-            }
-
-            // TODO: call DisasterService.findById(disasterId) -> SELECT * FROM disasters WHERE disaster_id = ?
-            DisasterRow found = dataList.stream()
-                    .filter(d -> d.getDisasterId().equals(disasterId))
-                    .findFirst()
-                    .orElse(null);
-
-            if (found == null) {
-                errorLabel.setText("Disaster not found");
-                return;
-            }
-
-            searchList.setAll(found);
-            disasterTable.setItems(searchList);
-            errorLabel.setText("");
-        } catch (Exception e) {
-            errorLabel.setText("Could not find disaster");
-            e.printStackTrace();
+        Integer disasterId = readId(disasterIdField.getText(), 'D', "Invalid disaster ID");
+        if (disasterId == null) {
+            return;
         }
+        runServiceTask(() -> disasterService.findDisaster(disasterId), disaster -> {
+            disasterTable.setItems(FXCollections.observableArrayList(disaster));
+            populateForm(disaster);
+        }, "disaster-find");
     }
 
     @FXML
@@ -266,14 +175,73 @@ public class DisasterController extends Utility {
         changeScene(event, "dashboard", "Dashboard");
     }
 
-    private String formatActivePeriod() {
+    private boolean validForm() {
+        if (nameField.getText() == null || nameField.getText().isBlank()) {
+            errorLabel.setText("Disaster name is required");
+            return false;
+        }
         LocalDate start = activePeriodStartPicker.getValue();
         LocalDate end = activePeriodEndPicker.getValue();
-        if (start == null && end == null) {
-            return "—";
+        if (start != null && end != null && !start.isBefore(end)) {
+            errorLabel.setText("Active-period end must be after its start");
+            return false;
         }
-        String startText = start == null ? "?" : start.toString();
-        String endText = end == null ? "?" : end.toString();
-        return startText + " → " + endText;
+        return true;
+    }
+
+    private void populateForm(Disaster disaster) {
+        if (disaster == null) {
+            return;
+        }
+        disasterIdField.setText("D" + disaster.disasterId());
+        nameField.setText(disaster.name());
+        typeCombo.setValue(disaster.type());
+        severityCombo.setValue(disaster.severity());
+        statusCombo.setValue(disaster.status());
+        activePeriodStartPicker.setValue(disaster.activePeriod() == null
+                ? null : disaster.activePeriod().startInclusive());
+        activePeriodEndPicker.setValue(disaster.activePeriod() == null
+                ? null : disaster.activePeriod().endExclusive());
+    }
+
+    private Integer readId(String text, char prefix, String message) {
+        try {
+            String normalized = text == null ? "" : text.trim();
+            if (!normalized.isEmpty() && Character.toUpperCase(normalized.charAt(0)) == prefix) {
+                normalized = normalized.substring(1);
+            }
+            int id = Integer.parseInt(normalized);
+            if (id <= 0) {
+                throw new NumberFormatException();
+            }
+            return id;
+        } catch (NumberFormatException exception) {
+            errorLabel.setText(message);
+            return null;
+        }
+    }
+
+    private <T> void runServiceTask(Supplier<ServiceResult<T>> call, Consumer<T> onSuccess,
+            String threadName) {
+        Task<ServiceResult<T>> task = new Task<>() {
+            @Override
+            protected ServiceResult<T> call() {
+                return call.get();
+            }
+        };
+        task.setOnSucceeded(ignored -> {
+            ServiceResult<T> result = task.getValue();
+            errorLabel.setText(result.success() ? "" : result.message());
+            if (result.success()) {
+                onSuccess.accept(result.value());
+            }
+        });
+        task.setOnFailed(ignored -> {
+            LOGGER.log(Level.SEVERE, "Disaster operation failed", task.getException());
+            errorLabel.setText("Disaster operation failed");
+        });
+        Thread thread = new Thread(task, threadName);
+        thread.setDaemon(true);
+        thread.start();
     }
 }

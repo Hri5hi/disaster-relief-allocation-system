@@ -1,12 +1,22 @@
 package com.groupa13.disasterrelief.controller;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
+import com.groupa13.disasterrelief.model.core.Resource;
+import com.groupa13.disasterrelief.model.core.ResourceCategory;
+import com.groupa13.disasterrelief.service.core.ResourceCategoryService;
+import com.groupa13.disasterrelief.service.core.ResourceService;
+import com.groupa13.disasterrelief.service.core.ServiceResult;
 import com.groupa13.disasterrelief.util.Utility;
 
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.property.StringProperty;
+import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
@@ -23,353 +33,192 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
-import javafx.scene.control.cell.PropertyValueFactory;
 
 public class ResourceController extends Utility {
 
-    // TODO: replace with com.groupa13.disasterrelief.model.Resource once the model layer
-    // exists. Mirrors the `resources` table (resource_id, name, category_id, unit).
-    public static class ResourceRow {
-        private final StringProperty resourceId;
-        private final StringProperty name;
-        private final StringProperty category;
-        private final StringProperty unit;
+    private static final Logger LOGGER = Logger.getLogger(ResourceController.class.getName());
+    private static final ResourceCategory ROOT =
+            new ResourceCategory(0, "All Categories", null, -1, "All Categories");
 
-        public ResourceRow(String resourceId, String name, String category, String unit) {
-            this.resourceId = new SimpleStringProperty(resourceId);
-            this.name = new SimpleStringProperty(name);
-            this.category = new SimpleStringProperty(category);
-            this.unit = new SimpleStringProperty(unit);
-        }
-
-        public String getResourceId() { return resourceId.get(); }
-        public String getName() { return name.get(); }
-        public String getCategory() { return category.get(); }
-        public String getUnit() { return unit.get(); }
-    }
-
-    // TODO: replace with com.groupa13.disasterrelief.model.ResourceCategory once the model
-    // layer exists. Mirrors the self-referencing `resource_categories` table
-    // (category_id, name, parent_id). Held here just as tree/combo display data.
-    private static class CategoryNode {
-        final String categoryId;
-        final String name;
-
-        CategoryNode(String categoryId, String name) {
-            this.categoryId = categoryId;
-            this.name = name;
-        }
-
-        @Override
-        public String toString() {
-            return name;
-        }
-    }
-
-    @FXML private TreeView<CategoryNode> categoryTree;
-
+    @FXML private TreeView<ResourceCategory> categoryTree;
     @FXML private TextField resourceIdField;
     @FXML private TextField nameField;
-    @FXML private ComboBox<String> categoryCombo;
+    @FXML private ComboBox<ResourceCategory> categoryCombo;
     @FXML private ComboBox<String> unitCombo;
     @FXML private Label errorLabel;
+    @FXML private TableView<Resource> resourceTable;
+    @FXML private TableColumn<Resource, String> colResourceId;
+    @FXML private TableColumn<Resource, String> colName;
+    @FXML private TableColumn<Resource, String> colCategory;
+    @FXML private TableColumn<Resource, String> colUnit;
 
-    @FXML private TableView<ResourceRow> resourceTable;
-    @FXML private TableColumn<ResourceRow, String> colResourceId;
-    @FXML private TableColumn<ResourceRow, String> colName;
-    @FXML private TableColumn<ResourceRow, String> colCategory;
-    @FXML private TableColumn<ResourceRow, String> colUnit;
+    private final ObservableList<Resource> dataList = FXCollections.observableArrayList();
+    private final ResourceCategoryService categoryService;
+    private final ResourceService resourceService;
 
-    private final ObservableList<ResourceRow> dataList = FXCollections.observableArrayList();
-    private final ObservableList<ResourceRow> searchList = FXCollections.observableArrayList();
-    private int nextCategorySeq = 1;
+    public ResourceController() {
+        this(new ResourceCategoryService(), new ResourceService());
+    }
+
+    ResourceController(ResourceCategoryService categoryService, ResourceService resourceService) {
+        this.categoryService = categoryService;
+        this.resourceService = resourceService;
+    }
 
     @FXML
     public void initialize() {
-        unitCombo.getItems().addAll("packets", "litres", "pieces", "kg", "boxes", "units");
-
-        colResourceId.setCellValueFactory(new PropertyValueFactory<>("resourceId"));
-        colName.setCellValueFactory(new PropertyValueFactory<>("name"));
-        colCategory.setCellValueFactory(new PropertyValueFactory<>("category"));
-        colUnit.setCellValueFactory(new PropertyValueFactory<>("unit"));
-
-        buildCategoryTree();
-        refreshCategoryCombo();
+        unitCombo.getItems().setAll("packets", "litres", "pieces", "kg", "boxes", "units");
+        colResourceId.setCellValueFactory(cell ->
+                new ReadOnlyStringWrapper("R" + cell.getValue().resourceId()));
+        colName.setCellValueFactory(cell -> new ReadOnlyStringWrapper(cell.getValue().name()));
+        colCategory.setCellValueFactory(cell ->
+                new ReadOnlyStringWrapper(cell.getValue().categoryPath()));
+        colUnit.setCellValueFactory(cell -> new ReadOnlyStringWrapper(
+                cell.getValue().unit() == null ? "—" : cell.getValue().unit()));
+        resourceTable.setItems(dataList);
+        resourceTable.getSelectionModel().selectedItemProperty().addListener(
+                (ignored, previous, selected) -> populateForm(selected));
+        categoryTree.getSelectionModel().selectedItemProperty().addListener(
+                (ignored, previous, selected) -> {
+                    if (selected != null && selected.getValue().categoryId() > 0) {
+                        categoryCombo.setValue(selected.getValue());
+                    }
+                });
+        loadCategories();
         loadResources();
     }
 
-    // ------------------------------------------------------------------
-    // Category tree (self-referencing resource_categories hierarchy)
-    // ------------------------------------------------------------------
+    private void loadCategories() {
+        runServiceTask(categoryService::getCategoryTree, this::displayCategories,
+                "category-loader");
+    }
 
-    private void buildCategoryTree() {
-        // TODO: replace with CategoryService.getCategoryTree() -> a recursive CTE over
-        // resource_categories (WITH RECURSIVE cat_tree AS (... UNION ALL ...)) that
-        // returns the full parent/child hierarchy in one round trip.
-        TreeItem<CategoryNode> root = new TreeItem<>(new CategoryNode("C0", "All Categories"));
+    private void displayCategories(List<ResourceCategory> categories) {
+        TreeItem<ResourceCategory> root = new TreeItem<>(ROOT);
         root.setExpanded(true);
-
-        TreeItem<CategoryNode> medical = new TreeItem<>(new CategoryNode("C1", "Medical"));
-        TreeItem<CategoryNode> firstAid = new TreeItem<>(new CategoryNode("C2", "First Aid"));
-        firstAid.getChildren().addAll(
-                new TreeItem<>(new CategoryNode("C3", "Bandages")),
-                new TreeItem<>(new CategoryNode("C4", "Antiseptic")));
-        medical.getChildren().add(firstAid);
-        medical.setExpanded(true);
-        firstAid.setExpanded(true);
-
-        TreeItem<CategoryNode> food = new TreeItem<>(new CategoryNode("C5", "Food & Water"));
-        food.getChildren().addAll(
-                new TreeItem<>(new CategoryNode("C6", "Dry Rations")),
-                new TreeItem<>(new CategoryNode("C7", "Drinking Water")));
-
-        TreeItem<CategoryNode> shelterItems = new TreeItem<>(new CategoryNode("C8", "Shelter & Bedding"));
-        shelterItems.getChildren().addAll(
-                new TreeItem<>(new CategoryNode("C9", "Tarpaulins")),
-                new TreeItem<>(new CategoryNode("C10", "Blankets")));
-
-        root.getChildren().addAll(medical, food, shelterItems);
-        nextCategorySeq = 11;
-
+        Map<Integer, TreeItem<ResourceCategory>> items = new HashMap<>();
+        for (ResourceCategory category : categories) {
+            TreeItem<ResourceCategory> item = new TreeItem<>(category);
+            items.put(category.categoryId(), item);
+            TreeItem<ResourceCategory> parent = category.parentId() == null
+                    ? root : items.get(category.parentId());
+            (parent == null ? root : parent).getChildren().add(item);
+        }
         categoryTree.setRoot(root);
         categoryTree.setShowRoot(true);
-        categoryTree.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal) -> {
-            // Selecting a category in the tree pre-fills the resource form's category combo.
-            if (newVal != null && newVal.getValue() != null) {
-                String path = buildPath(newVal);
-                if (categoryCombo.getItems().contains(path)) {
-                    categoryCombo.setValue(path);
-                }
-            }
-        });
-    }
-
-    private String buildPath(TreeItem<CategoryNode> item) {
-        StringBuilder sb = new StringBuilder(item.getValue().name);
-        TreeItem<CategoryNode> parent = item.getParent();
-        while (parent != null && parent.getValue() != null && parent.getParent() != null) {
-            sb.insert(0, parent.getValue().name + " > ");
-            parent = parent.getParent();
-        }
-        return sb.toString();
-    }
-
-    private void refreshCategoryCombo() {
-        categoryCombo.getItems().clear();
-        flattenTree(categoryTree.getRoot(), categoryCombo.getItems());
-    }
-
-    private void flattenTree(TreeItem<CategoryNode> item, ObservableList<String> target) {
-        if (item == null) {
-            return;
-        }
-        if (item.getParent() != null) {
-            target.add(buildPath(item));
-        }
-        for (TreeItem<CategoryNode> child : item.getChildren()) {
-            flattenTree(child, target);
-        }
+        categoryCombo.getItems().setAll(categories);
     }
 
     @FXML
     public void handleAddCategory(ActionEvent event) {
-        addCategory(categoryTree.getRoot());
+        requestCategoryName(null, "Add top-level category");
     }
 
     @FXML
     public void handleAddSubcategory(ActionEvent event) {
-        TreeItem<CategoryNode> selected = categoryTree.getSelectionModel().getSelectedItem();
+        TreeItem<ResourceCategory> selected = categoryTree.getSelectionModel().getSelectedItem();
         if (selected == null) {
             errorLabel.setText("Select a parent category first");
             return;
         }
-        addCategory(selected);
+        Integer parentId = selected.getValue().categoryId() == 0
+                ? null : selected.getValue().categoryId();
+        requestCategoryName(parentId, "Add subcategory under " + selected.getValue().name());
     }
 
-    private void addCategory(TreeItem<CategoryNode> parent) {
+    private void requestCategoryName(Integer parentId, String header) {
         TextInputDialog dialog = new TextInputDialog();
         dialog.setTitle("New Category");
-        dialog.setHeaderText("Add category under \"" + parent.getValue().name + "\"");
+        dialog.setHeaderText(header);
         dialog.setContentText("Category name:");
-        Optional<String> result = dialog.showAndWait();
-
-        result.filter(name -> !name.isBlank()).ifPresent(name -> {
-            // TODO: call CategoryService.createCategory(name, parentId) -> INSERT INTO
-            // resource_categories (name, parent_id) VALUES (?, ?) where parent_id is
-            // NULL when parent is the synthetic "All Categories" root.
-            String newId = "C" + (nextCategorySeq++);
-            TreeItem<CategoryNode> newItem = new TreeItem<>(new CategoryNode(newId, name));
-            parent.getChildren().add(newItem);
-            parent.setExpanded(true);
-            refreshCategoryCombo();
-            errorLabel.setText("");
-        });
+        Optional<String> answer = dialog.showAndWait();
+        if (answer.isEmpty() || answer.get().isBlank()) {
+            return;
+        }
+        runServiceTask(() -> categoryService.createCategory(answer.get(), parentId),
+                ignored -> loadCategories(), "category-create");
     }
 
     @FXML
     public void handleDeleteCategory(ActionEvent event) {
-        TreeItem<CategoryNode> selected = categoryTree.getSelectionModel().getSelectedItem();
-        if (selected == null || selected.getParent() == null) {
+        TreeItem<ResourceCategory> selected = categoryTree.getSelectionModel().getSelectedItem();
+        if (selected == null || selected.getValue().categoryId() == 0) {
             errorLabel.setText("Select a category to delete");
             return;
         }
-
-        boolean inUse = dataList.stream().anyMatch(r -> r.getCategory().equals(buildPath(selected)));
-        if (inUse || !selected.getChildren().isEmpty()) {
-            Alert warn = new Alert(AlertType.CONFIRMATION);
-            warn.setTitle("Delete Category");
-            warn.setHeaderText("This category has resources and/or subcategories under it");
-            warn.setContentText("Deleting it will require reassigning or removing those first. Continue anyway?");
-            Optional<ButtonType> result = warn.showAndWait();
-            if (result.isEmpty() || result.get() != ButtonType.OK) {
-                return;
-            }
+        Alert confirmation = new Alert(AlertType.CONFIRMATION,
+                "Delete " + selected.getValue().path() + "?", ButtonType.OK, ButtonType.CANCEL);
+        confirmation.setTitle("Delete Category");
+        if (confirmation.showAndWait().filter(ButtonType.OK::equals).isEmpty()) {
+            return;
         }
-
-        // TODO: call CategoryService.deleteCategory(categoryId) -> DELETE FROM
-        // resource_categories WHERE category_id = ?. The FK from `resources` and from
-        // child categories' parent_id will reject this unless reassigned/cascaded first.
-        selected.getParent().getChildren().remove(selected);
-        refreshCategoryCombo();
-        errorLabel.setText("");
+        int categoryId = selected.getValue().categoryId();
+        runServiceTask(() -> categoryService.deleteCategory(categoryId),
+                ignored -> loadCategories(), "category-delete");
     }
 
-    // ------------------------------------------------------------------
-    // Resource CRUD
-    // ------------------------------------------------------------------
-
     private void loadResources() {
-        Task<List<ResourceRow>> loadTask = new Task<>() {
-            @Override
-            protected List<ResourceRow> call() {
-                // TODO: replace with ResourceService.getAllResources() -> SELECT r.*, c.name
-                // AS category_name FROM resources r JOIN resource_categories c
-                // ON r.category_id = c.category_id.
-                return List.of(
-                        new ResourceRow("R3001", "Paracetamol 500mg", "Medical > First Aid > Bandages", "packets"),
-                        new ResourceRow("R3002", "20L Water Drum", "Food & Water > Drinking Water", "pieces")
-                );
-            }
-        };
-
-        loadTask.setOnSucceeded(e -> {
-            dataList.setAll(loadTask.getValue());
+        runServiceTask(resourceService::listResources, resources -> {
+            dataList.setAll(resources);
             resourceTable.setItems(dataList);
-        });
-
-        loadTask.setOnFailed(e -> {
-            errorLabel.setText("Failed to load resources from database");
-            if (loadTask.getException() != null) {
-                loadTask.getException().printStackTrace();
-            }
-        });
-
-        Thread thread = new Thread(loadTask, "resource-loader");
-        thread.setDaemon(true);
-        thread.start();
+        }, "resource-loader");
     }
 
     @FXML
     public void handleAdd(ActionEvent event) {
-        try {
-            String name = nameField.getText();
-            if (name == null || name.isBlank()) {
-                errorLabel.setText("Resource name is required");
-                return;
-            }
-
-            String category = categoryCombo.getValue();
-            if (category == null) {
-                errorLabel.setText("Select a category");
-                return;
-            }
-
-            String unit = unitCombo.getValue();
-
-            // TODO: call ResourceService.registerResource(name, categoryId, unit) ->
-            // INSERT INTO resources (name, category_id, unit) VALUES (?, ?, ?)
-            String resourceId = resourceIdField.getText().isBlank()
-                    ? "R" + (3000 + dataList.size() + 1)
-                    : resourceIdField.getText();
-
-            ResourceRow row = new ResourceRow(resourceId, name, category, unit);
-            dataList.add(0, row);
-            resourceTable.setItems(dataList);
-            errorLabel.setText("");
-        } catch (Exception e) {
-            errorLabel.setText("Could not add resource");
-            e.printStackTrace();
+        if (!validName()) {
+            return;
         }
+        ResourceCategory category = categoryCombo.getValue();
+        if (category == null) {
+            errorLabel.setText("Select a category");
+            return;
+        }
+        runServiceTask(() -> resourceService.createResource(nameField.getText(),
+                category.categoryId(), unitCombo.getValue()), ignored -> {
+                    handleClear(null);
+                    loadResources();
+                }, "resource-create");
     }
 
     @FXML
     public void handleUpdate(ActionEvent event) {
-        try {
-            String resourceId = resourceIdField.getText();
-            if (resourceId == null || resourceId.isBlank()) {
-                errorLabel.setText("Invalid resource ID");
-                return;
-            }
-
-            // TODO: call ResourceService.updateResource(resourceId, name, categoryId, unit)
-            // -> UPDATE resources SET name=?, category_id=?, unit=? WHERE resource_id=?
-
-            errorLabel.setText("");
-            loadResources();
-        } catch (Exception e) {
-            errorLabel.setText("Could not update resource");
-            e.printStackTrace();
+        Integer resourceId = readId(resourceIdField.getText());
+        ResourceCategory category = categoryCombo.getValue();
+        if (resourceId == null || !validName()) {
+            return;
         }
+        if (category == null) {
+            errorLabel.setText("Select a category");
+            return;
+        }
+        runServiceTask(() -> resourceService.updateResource(resourceId, nameField.getText(),
+                category.categoryId(), unitCombo.getValue()), ignored -> loadResources(),
+                "resource-update");
     }
 
     @FXML
     public void handleDelete(ActionEvent event) {
-        try {
-            String resourceId = resourceIdField.getText();
-            if (resourceId == null || resourceId.isBlank()) {
-                errorLabel.setText("Invalid resource ID");
-                return;
-            }
-
-            // TODO: call ResourceService.deleteResource(resourceId) -> DELETE FROM resources
-            // WHERE resource_id = ?. Will be blocked by FK if shelter_inventory,
-            // resource_requests, or distribution_log rows reference it.
-            dataList.removeIf(r -> r.getResourceId().equals(resourceId));
-            resourceTable.setItems(dataList);
-            errorLabel.setText("");
-        } catch (Exception e) {
-            errorLabel.setText("Could not delete resource");
-            e.printStackTrace();
+        Integer resourceId = readId(resourceIdField.getText());
+        if (resourceId == null) {
+            return;
         }
+        runServiceTask(() -> resourceService.deleteResource(resourceId), ignored -> {
+            handleClear(null);
+            loadResources();
+        }, "resource-delete");
     }
 
     @FXML
     public void handleFind(ActionEvent event) {
-        try {
-            String resourceId = resourceIdField.getText();
-            if (resourceId == null || resourceId.isBlank()) {
-                errorLabel.setText("Invalid resource ID");
-                return;
-            }
-
-            // TODO: call ResourceService.findById(resourceId) -> SELECT * FROM resources WHERE resource_id = ?
-            ResourceRow found = dataList.stream()
-                    .filter(r -> r.getResourceId().equals(resourceId))
-                    .findFirst()
-                    .orElse(null);
-
-            if (found == null) {
-                errorLabel.setText("Resource not found");
-                return;
-            }
-
-            searchList.setAll(found);
-            resourceTable.setItems(searchList);
-            errorLabel.setText("");
-        } catch (Exception e) {
-            errorLabel.setText("Could not find resource");
-            e.printStackTrace();
+        Integer resourceId = readId(resourceIdField.getText());
+        if (resourceId == null) {
+            return;
         }
+        runServiceTask(() -> resourceService.findResource(resourceId), resource -> {
+            resourceTable.setItems(FXCollections.observableArrayList(resource));
+            populateForm(resource);
+        }, "resource-find");
     }
 
     @FXML
@@ -385,5 +234,66 @@ public class ResourceController extends Utility {
     @FXML
     public void goBack(ActionEvent event) {
         changeScene(event, "dashboard", "Dashboard");
+    }
+
+    private void populateForm(Resource resource) {
+        if (resource == null) {
+            return;
+        }
+        resourceIdField.setText("R" + resource.resourceId());
+        nameField.setText(resource.name());
+        unitCombo.setValue(resource.unit());
+        categoryCombo.getItems().stream()
+                .filter(category -> category.categoryId() == resource.categoryId())
+                .findFirst().ifPresent(categoryCombo::setValue);
+    }
+
+    private Integer readId(String text) {
+        try {
+            String normalized = text == null ? "" : text.trim();
+            if (!normalized.isEmpty() && Character.toUpperCase(normalized.charAt(0)) == 'R') {
+                normalized = normalized.substring(1);
+            }
+            int id = Integer.parseInt(normalized);
+            if (id <= 0) {
+                throw new NumberFormatException();
+            }
+            return id;
+        } catch (NumberFormatException exception) {
+            errorLabel.setText("Invalid resource ID");
+            return null;
+        }
+    }
+
+    private boolean validName() {
+        if (nameField.getText() == null || nameField.getText().isBlank()) {
+            errorLabel.setText("Resource name is required");
+            return false;
+        }
+        return true;
+    }
+
+    private <T> void runServiceTask(Supplier<ServiceResult<T>> call, Consumer<T> onSuccess,
+            String threadName) {
+        Task<ServiceResult<T>> task = new Task<>() {
+            @Override
+            protected ServiceResult<T> call() {
+                return call.get();
+            }
+        };
+        task.setOnSucceeded(ignored -> {
+            ServiceResult<T> result = task.getValue();
+            errorLabel.setText(result.success() ? "" : result.message());
+            if (result.success()) {
+                onSuccess.accept(result.value());
+            }
+        });
+        task.setOnFailed(ignored -> {
+            LOGGER.log(Level.SEVERE, "Resource operation failed", task.getException());
+            errorLabel.setText("Resource operation failed");
+        });
+        Thread thread = new Thread(task, threadName);
+        thread.setDaemon(true);
+        thread.start();
     }
 }

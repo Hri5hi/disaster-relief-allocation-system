@@ -60,11 +60,13 @@ class CorePlatformIntegrationTest {
 
     @Test
     void freshDatabaseContainsTheCompleteV001ToV003Contract() throws SQLException {
-        assertEquals(3, queryLong("""
-                SELECT count(*)
-                FROM flyway_schema_history
-                WHERE success AND version IS NOT NULL
-                """));
+        assertEquals(
+                Set.of("001", "002", "003"),
+                querySet("""
+                        SELECT version
+                        FROM flyway_schema_history
+                        WHERE success AND version IN ('001', '002', '003')
+                        """));
 
         assertEquals(
                 Set.of("btree_gist", "pgcrypto"),
@@ -84,21 +86,18 @@ class CorePlatformIntegrationTest {
                         )
                         """));
 
-        assertEquals(
-                Set.of(
+        assertTrue(querySet("""
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_type = 'BASE TABLE'
+                """).containsAll(Set.of(
                         "disasters",
                         "zones",
                         "shelters",
                         "resource_categories",
                         "resources",
-                        "shelter_inventory"),
-                querySet("""
-                        SELECT table_name
-                        FROM information_schema.tables
-                        WHERE table_schema = 'public'
-                          AND table_type = 'BASE TABLE'
-                          AND table_name <> 'flyway_schema_history'
-                        """));
+                        "shelter_inventory")));
 
         assertEquals("NO", queryString("""
                 SELECT is_nullable

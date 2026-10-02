@@ -1,11 +1,26 @@
 package com.groupa13.disasterrelief.controller;
 
-import java.util.List;
+import java.time.format.DateTimeFormatter;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
+import com.groupa13.disasterrelief.db.DatabaseConfig;
+import com.groupa13.disasterrelief.db.DatabaseException;
+import com.groupa13.disasterrelief.model.core.EntityOption;
+import com.groupa13.disasterrelief.model.core.LowStockAlert;
+import com.groupa13.disasterrelief.model.core.ShelterInventory;
+import com.groupa13.disasterrelief.service.core.InventoryService;
+import com.groupa13.disasterrelief.service.core.LowStockNotificationListener;
+import com.groupa13.disasterrelief.service.core.PostgresLowStockNotificationListener;
+import com.groupa13.disasterrelief.service.core.ResourceService;
+import com.groupa13.disasterrelief.service.core.ServiceResult;
+import com.groupa13.disasterrelief.service.core.ShelterService;
 import com.groupa13.disasterrelief.util.Utility;
 
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.property.StringProperty;
+import javafx.application.Platform;
+import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
@@ -17,152 +32,97 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
-import javafx.scene.control.cell.PropertyValueFactory;
 
-public class InventoryController extends Utility {
+public class InventoryController extends Utility implements AutoCloseable {
 
-    // TODO: replace with com.groupa13.disasterrelief.model.ShelterInventory once the model
-    // layer exists. Mirrors the `shelter_inventory` table (shelter_id, resource_id,
-    // quantity, reorder_level, last_updated) — composite PK (shelter_id, resource_id).
-    public static class InventoryRow {
-        private final StringProperty shelter;
-        private final StringProperty resource;
-        private final StringProperty quantity;
-        private final StringProperty reorderLevel;
-        private final StringProperty lastUpdated;
-        private final boolean lowStock;
+    private static final Logger LOGGER = Logger.getLogger(InventoryController.class.getName());
+    private static final DateTimeFormatter TIMESTAMP =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-        public InventoryRow(String shelter, String resource, int quantity, int reorderLevel, String lastUpdated) {
-            this.shelter = new SimpleStringProperty(shelter);
-            this.resource = new SimpleStringProperty(resource);
-            this.quantity = new SimpleStringProperty(String.valueOf(quantity));
-            this.reorderLevel = new SimpleStringProperty(String.valueOf(reorderLevel));
-            this.lastUpdated = new SimpleStringProperty(lastUpdated);
-            this.lowStock = quantity < reorderLevel;
-        }
-
-        public String getShelter() { return shelter.get(); }
-        public String getResource() { return resource.get(); }
-        public String getQuantity() { return quantity.get(); }
-        public String getReorderLevel() { return reorderLevel.get(); }
-        public String getLastUpdated() { return lastUpdated.get(); }
-        public String getStockStatus() { return lowStock ? "LOW STOCK" : "OK"; }
-        public boolean isLowStock() { return lowStock; }
-    }
-
-    @FXML private ComboBox<String> shelterCombo;
-    @FXML private ComboBox<String> resourceCombo;
+    @FXML private ComboBox<EntityOption> shelterCombo;
+    @FXML private ComboBox<EntityOption> resourceCombo;
     @FXML private TextField quantityField;
     @FXML private TextField reorderLevelField;
     @FXML private TextField lastUpdatedField;
     @FXML private Label errorLabel;
     @FXML private Label lowStockBadge;
+    @FXML private TableView<ShelterInventory> inventoryTable;
+    @FXML private TableColumn<ShelterInventory, String> colShelter;
+    @FXML private TableColumn<ShelterInventory, String> colResource;
+    @FXML private TableColumn<ShelterInventory, String> colQuantity;
+    @FXML private TableColumn<ShelterInventory, String> colReorderLevel;
+    @FXML private TableColumn<ShelterInventory, String> colLastUpdated;
+    @FXML private TableColumn<ShelterInventory, String> colStockStatus;
 
-    @FXML private TableView<InventoryRow> inventoryTable;
-    @FXML private TableColumn<InventoryRow, String> colShelter;
-    @FXML private TableColumn<InventoryRow, String> colResource;
-    @FXML private TableColumn<InventoryRow, String> colQuantity;
-    @FXML private TableColumn<InventoryRow, String> colReorderLevel;
-    @FXML private TableColumn<InventoryRow, String> colLastUpdated;
-    @FXML private TableColumn<InventoryRow, String> colStockStatus;
+    private final ObservableList<ShelterInventory> dataList = FXCollections.observableArrayList();
+    private final InventoryService inventoryService;
+    private final ShelterService shelterService;
+    private final ResourceService resourceService;
+    private LowStockNotificationListener notificationListener;
+    private boolean showingLowStockOnly;
 
-    private final ObservableList<InventoryRow> dataList = FXCollections.observableArrayList();
-    private final ObservableList<InventoryRow> searchList = FXCollections.observableArrayList();
-    private boolean showingLowStockOnly = false;
+    public InventoryController() {
+        this(new InventoryService(), new ShelterService(), new ResourceService(), null);
+    }
+
+    InventoryController(InventoryService inventoryService, ShelterService shelterService,
+            ResourceService resourceService, LowStockNotificationListener notificationListener) {
+        this.inventoryService = inventoryService;
+        this.shelterService = shelterService;
+        this.resourceService = resourceService;
+        this.notificationListener = notificationListener;
+    }
 
     @FXML
     public void initialize() {
-        colShelter.setCellValueFactory(new PropertyValueFactory<>("shelter"));
-        colResource.setCellValueFactory(new PropertyValueFactory<>("resource"));
-        colQuantity.setCellValueFactory(new PropertyValueFactory<>("quantity"));
-        colReorderLevel.setCellValueFactory(new PropertyValueFactory<>("reorderLevel"));
-        colLastUpdated.setCellValueFactory(new PropertyValueFactory<>("lastUpdated"));
-        colStockStatus.setCellValueFactory(new PropertyValueFactory<>("stockStatus"));
-
-        // Highlight the whole row when stock is below the reorder threshold.
-        inventoryTable.setRowFactory(tv -> new TableRow<InventoryRow>() {
+        colShelter.setCellValueFactory(cell -> new ReadOnlyStringWrapper(
+                "S" + cell.getValue().shelterId() + " — " + cell.getValue().shelterName()));
+        colResource.setCellValueFactory(cell -> new ReadOnlyStringWrapper(
+                "R" + cell.getValue().resourceId() + " — " + cell.getValue().resourceName()));
+        colQuantity.setCellValueFactory(cell ->
+                new ReadOnlyStringWrapper(Integer.toString(cell.getValue().quantity())));
+        colReorderLevel.setCellValueFactory(cell ->
+                new ReadOnlyStringWrapper(Integer.toString(cell.getValue().reorderLevel())));
+        colLastUpdated.setCellValueFactory(cell -> new ReadOnlyStringWrapper(
+                cell.getValue().lastUpdated().format(TIMESTAMP)));
+        colStockStatus.setCellValueFactory(cell -> new ReadOnlyStringWrapper(
+                cell.getValue().lowStock() ? "LOW STOCK" : "OK"));
+        inventoryTable.setRowFactory(ignored -> new TableRow<>() {
             @Override
-            protected void updateItem(InventoryRow row, boolean empty) {
-                super.updateItem(row, empty);
+            protected void updateItem(ShelterInventory inventory, boolean empty) {
+                super.updateItem(inventory, empty);
                 getStyleClass().remove("row-low-stock");
-                if (!empty && row != null && row.isLowStock()) {
+                if (!empty && inventory != null && inventory.lowStock()) {
                     getStyleClass().add("row-low-stock");
                 }
             }
         });
-
+        inventoryTable.getSelectionModel().selectedItemProperty().addListener(
+                (ignored, previous, selected) -> populateForm(selected));
         loadShelterOptions();
         loadResourceOptions();
         loadInventory();
-
-        // TODO: subscribe to LISTEN/NOTIFY on channel 'low_stock_alert' here via a
-        // background thread holding a dedicated PGConnection (PgConnection.getNotifications()
-        // after issuing LISTEN low_stock_alert). On notification, refresh the affected row
-        // and lowStockBadge without waiting for a manual reload — this table currently only
-        // recalculates low-stock state when loadInventory()/handleAdd/handleUpdate run.
+        startNotificationListener();
     }
 
     private void loadShelterOptions() {
-        // TODO: replace with ShelterService.getAllShelters() -> SELECT shelter_id, name FROM shelters.
-        shelterCombo.getItems().setAll(
-                "S2001 — Government School Hall, Meppadi",
-                "S2002 — Community Hall, Kalpetta");
+        runServiceTask(shelterService::listShelterOptions,
+                options -> shelterCombo.getItems().setAll(options),
+                "inventory-shelter-options");
     }
 
     private void loadResourceOptions() {
-        // TODO: replace with ResourceService.getAllResources() -> SELECT resource_id, name FROM resources.
-        resourceCombo.getItems().setAll(
-                "R3001 — Paracetamol 500mg",
-                "R3002 — 20L Water Drum");
+        runServiceTask(resourceService::listResourceOptions,
+                options -> resourceCombo.getItems().setAll(options),
+                "inventory-resource-options");
     }
 
     private void loadInventory() {
-        Task<List<InventoryRow>> loadTask = new Task<>() {
-            @Override
-            protected List<InventoryRow> call() {
-                // TODO: replace with InventoryService.getAllInventory() -> SELECT si.*, s.name
-                // AS shelter_name, r.name AS resource_name FROM shelter_inventory si
-                // JOIN shelters s ON si.shelter_id = s.shelter_id
-                // JOIN resources r ON si.resource_id = r.resource_id.
-                return List.of(
-                        new InventoryRow("Government School Hall, Meppadi", "Paracetamol 500mg", 8, 20, "2026-07-30 09:12"),
-                        new InventoryRow("Government School Hall, Meppadi", "20L Water Drum", 145, 30, "2026-07-30 09:12"),
-                        new InventoryRow("Community Hall, Kalpetta", "Paracetamol 500mg", 25, 20, "2026-07-29 18:40")
-                );
-            }
-        };
-
-        loadTask.setOnSucceeded(e -> {
-            dataList.setAll(loadTask.getValue());
+        runServiceTask(inventoryService::listInventory, inventory -> {
+            dataList.setAll(inventory);
             applyCurrentFilter();
             updateLowStockBadge();
-        });
-
-        loadTask.setOnFailed(e -> {
-            errorLabel.setText("Failed to load inventory from database");
-            if (loadTask.getException() != null) {
-                loadTask.getException().printStackTrace();
-            }
-        });
-
-        Thread thread = new Thread(loadTask, "inventory-loader");
-        thread.setDaemon(true);
-        thread.start();
-    }
-
-    private void updateLowStockBadge() {
-        long count = dataList.stream().filter(InventoryRow::isLowStock).count();
-        lowStockBadge.setText(count + " Low Stock");
-    }
-
-    private void applyCurrentFilter() {
-        if (showingLowStockOnly) {
-            ObservableList<InventoryRow> filtered = FXCollections.observableArrayList();
-            dataList.stream().filter(InventoryRow::isLowStock).forEach(filtered::add);
-            inventoryTable.setItems(filtered);
-        } else {
-            inventoryTable.setItems(dataList);
-        }
+        }, "inventory-loader");
     }
 
     @FXML
@@ -173,125 +133,63 @@ public class InventoryController extends Utility {
 
     @FXML
     public void handleAdd(ActionEvent event) {
-        try {
-            String shelter = shelterCombo.getValue();
-            String resource = resourceCombo.getValue();
-            if (shelter == null || resource == null) {
-                errorLabel.setText("Select a shelter and a resource");
-                return;
-            }
-
-            int quantity;
-            int reorderLevel;
-            try {
-                quantity = Integer.parseInt(quantityField.getText());
-                reorderLevel = reorderLevelField.getText().isBlank() ? 10 : Integer.parseInt(reorderLevelField.getText());
-            } catch (NumberFormatException nfe) {
-                errorLabel.setText("Quantity and reorder level must be numbers");
-                return;
-            }
-
-            if (quantity < 0) {
-                errorLabel.setText("Quantity cannot be negative");
-                return;
-            }
-
-            // TODO: call InventoryService.upsertInventory(shelterId, resourceId, quantity,
-            // reorderLevel) -> INSERT INTO shelter_inventory (...) VALUES (...)
-            // ON CONFLICT (shelter_id, resource_id) DO UPDATE SET quantity = ...
-            // NOTE: this is also the shape used by donation intake (UPSERT), so the DAO
-            // method should likely be shared between InventoryController and DonationController.
-            InventoryRow row = new InventoryRow(stripId(shelter), stripId(resource), quantity, reorderLevel, "just now");
-            dataList.add(0, row);
-            applyCurrentFilter();
-            updateLowStockBadge();
-            errorLabel.setText("");
-        } catch (Exception e) {
-            errorLabel.setText("Could not add inventory record");
-            e.printStackTrace();
-        }
+        saveInventory("inventory-create");
     }
 
     @FXML
     public void handleUpdate(ActionEvent event) {
-        try {
-            String shelter = shelterCombo.getValue();
-            String resource = resourceCombo.getValue();
-            if (shelter == null || resource == null) {
-                errorLabel.setText("Select a shelter and a resource to update");
-                return;
-            }
+        saveInventory("inventory-update");
+    }
 
-            // TODO: call InventoryService.updateInventory(shelterId, resourceId, quantity,
-            // reorderLevel) -> UPDATE shelter_inventory SET quantity=?, reorder_level=?,
-            // last_updated=NOW() WHERE shelter_id=? AND resource_id=?.
-            // NOTE: the low-stock trigger (trg_low_stock_alert) fires AFTER UPDATE here —
-            // this is the write path that can push quantity below reorder_level and
-            // trigger a pg_notify('low_stock_alert', ...) server-side.
-
-            errorLabel.setText("");
-            loadInventory();
-        } catch (Exception e) {
-            errorLabel.setText("Could not update inventory record");
-            e.printStackTrace();
+    private void saveInventory(String threadName) {
+        EntityOption shelter = shelterCombo.getValue();
+        EntityOption resource = resourceCombo.getValue();
+        if (shelter == null || resource == null) {
+            errorLabel.setText("Select a shelter and a resource");
+            return;
         }
+        int[] values = parseStockValues();
+        if (values == null) {
+            return;
+        }
+        runServiceTask(() -> inventoryService.replaceInventory(
+                shelter.id(), resource.id(), values[0], values[1]), inventory -> {
+                    upsertDisplayedRow(inventory);
+                    populateForm(inventory);
+                }, threadName);
     }
 
     @FXML
     public void handleDelete(ActionEvent event) {
-        try {
-            String shelter = shelterCombo.getValue();
-            String resource = resourceCombo.getValue();
-            if (shelter == null || resource == null) {
-                errorLabel.setText("Select a shelter and a resource to delete");
-                return;
-            }
-
-            // TODO: call InventoryService.deleteInventory(shelterId, resourceId) -> DELETE
-            // FROM shelter_inventory WHERE shelter_id=? AND resource_id=?.
-            String shelterName = stripId(shelter);
-            String resourceName = stripId(resource);
-            dataList.removeIf(r -> r.getShelter().equals(shelterName) && r.getResource().equals(resourceName));
-            applyCurrentFilter();
-            updateLowStockBadge();
-            errorLabel.setText("");
-        } catch (Exception e) {
-            errorLabel.setText("Could not delete inventory record");
-            e.printStackTrace();
+        EntityOption shelter = shelterCombo.getValue();
+        EntityOption resource = resourceCombo.getValue();
+        if (shelter == null || resource == null) {
+            errorLabel.setText("Select a shelter and a resource to delete");
+            return;
         }
+        runServiceTask(() -> inventoryService.deleteInventory(shelter.id(), resource.id()),
+                ignored -> {
+                    dataList.removeIf(row -> row.shelterId() == shelter.id()
+                            && row.resourceId() == resource.id());
+                    applyCurrentFilter();
+                    updateLowStockBadge();
+                    handleClear(null);
+                }, "inventory-delete");
     }
 
     @FXML
     public void handleFind(ActionEvent event) {
-        try {
-            String shelter = shelterCombo.getValue();
-            String resource = resourceCombo.getValue();
-            if (shelter == null || resource == null) {
-                errorLabel.setText("Select a shelter and a resource to find");
-                return;
-            }
-
-            // TODO: call InventoryService.find(shelterId, resourceId) -> SELECT * FROM
-            // shelter_inventory WHERE shelter_id=? AND resource_id=?.
-            String shelterName = stripId(shelter);
-            String resourceName = stripId(resource);
-            InventoryRow found = dataList.stream()
-                    .filter(r -> r.getShelter().equals(shelterName) && r.getResource().equals(resourceName))
-                    .findFirst()
-                    .orElse(null);
-
-            if (found == null) {
-                errorLabel.setText("No inventory record found for that shelter/resource pair");
-                return;
-            }
-
-            searchList.setAll(found);
-            inventoryTable.setItems(searchList);
-            errorLabel.setText("");
-        } catch (Exception e) {
-            errorLabel.setText("Could not find inventory record");
-            e.printStackTrace();
+        EntityOption shelter = shelterCombo.getValue();
+        EntityOption resource = resourceCombo.getValue();
+        if (shelter == null || resource == null) {
+            errorLabel.setText("Select a shelter and a resource to find");
+            return;
         }
+        runServiceTask(() -> inventoryService.findInventory(shelter.id(), resource.id()),
+                inventory -> {
+                    inventoryTable.setItems(FXCollections.observableArrayList(inventory));
+                    populateForm(inventory);
+                }, "inventory-find");
     }
 
     @FXML
@@ -307,15 +205,126 @@ public class InventoryController extends Utility {
 
     @FXML
     public void goBack(ActionEvent event) {
+        close();
         changeScene(event, "dashboard", "Dashboard");
     }
 
-    /** Strips the leading "ID — " prefix from a combo box entry, leaving just the display name. */
-    private String stripId(String comboEntry) {
-        if (comboEntry == null) {
+    @Override
+    public void close() {
+        LowStockNotificationListener listener = notificationListener;
+        notificationListener = null;
+        if (listener != null) {
+            listener.close();
+        }
+    }
+
+    private int[] parseStockValues() {
+        try {
+            int quantity = Integer.parseInt(quantityField.getText().trim());
+            String thresholdText = reorderLevelField.getText() == null
+                    ? "" : reorderLevelField.getText().trim();
+            int reorderLevel = thresholdText.isEmpty() ? 10 : Integer.parseInt(thresholdText);
+            if (quantity < 0 || reorderLevel < 0) {
+                errorLabel.setText("Quantity and reorder level cannot be negative");
+                return null;
+            }
+            return new int[] {quantity, reorderLevel};
+        } catch (NumberFormatException exception) {
+            errorLabel.setText("Quantity and reorder level must be whole numbers");
             return null;
         }
-        int dashIndex = comboEntry.indexOf(" — ");
-        return dashIndex == -1 ? comboEntry : comboEntry.substring(dashIndex + 3);
+    }
+
+    private void applyCurrentFilter() {
+        if (showingLowStockOnly) {
+            ObservableList<ShelterInventory> filtered = FXCollections.observableArrayList();
+            dataList.stream().filter(ShelterInventory::lowStock).forEach(filtered::add);
+            inventoryTable.setItems(filtered);
+        } else {
+            inventoryTable.setItems(dataList);
+        }
+    }
+
+    private void updateLowStockBadge() {
+        long count = dataList.stream().filter(ShelterInventory::lowStock).count();
+        lowStockBadge.setText(count + " Low Stock");
+    }
+
+    private void upsertDisplayedRow(ShelterInventory inventory) {
+        int replacementIndex = -1;
+        for (int index = 0; index < dataList.size(); index++) {
+            ShelterInventory row = dataList.get(index);
+            if (row.shelterId() == inventory.shelterId()
+                    && row.resourceId() == inventory.resourceId()) {
+                replacementIndex = index;
+                break;
+            }
+        }
+        if (replacementIndex < 0) {
+            dataList.add(inventory);
+        } else {
+            dataList.set(replacementIndex, inventory);
+        }
+        applyCurrentFilter();
+        updateLowStockBadge();
+    }
+
+    private void populateForm(ShelterInventory inventory) {
+        if (inventory == null) {
+            return;
+        }
+        selectOption(shelterCombo, inventory.shelterId());
+        selectOption(resourceCombo, inventory.resourceId());
+        quantityField.setText(Integer.toString(inventory.quantity()));
+        reorderLevelField.setText(Integer.toString(inventory.reorderLevel()));
+        lastUpdatedField.setText(inventory.lastUpdated().format(TIMESTAMP));
+    }
+
+    private static void selectOption(ComboBox<EntityOption> combo, int id) {
+        combo.getItems().stream().filter(option -> option.id() == id).findFirst()
+                .ifPresent(combo::setValue);
+    }
+
+    private void startNotificationListener() {
+        try {
+            if (notificationListener == null) {
+                notificationListener = new PostgresLowStockNotificationListener(
+                        DatabaseConfig.load());
+            }
+            notificationListener.start(alert ->
+                    Platform.runLater(() -> refreshInventoryRow(alert)));
+        } catch (DatabaseException | IllegalStateException exception) {
+            LOGGER.log(Level.WARNING, "Low-stock listener is unavailable", exception);
+        }
+    }
+
+    private void refreshInventoryRow(LowStockAlert alert) {
+        runServiceTask(() -> inventoryService.findInventory(
+                alert.shelterId(), alert.resourceId()), this::upsertDisplayedRow,
+                "inventory-notification-refresh");
+    }
+
+    private <T> void runServiceTask(Supplier<ServiceResult<T>> call, Consumer<T> onSuccess,
+            String threadName) {
+        Task<ServiceResult<T>> task = new Task<>() {
+            @Override
+            protected ServiceResult<T> call() {
+                return call.get();
+            }
+        };
+        task.setOnSucceeded(ignored -> {
+            ServiceResult<T> result = task.getValue();
+            errorLabel.setText(result.success() ? "" : result.message());
+            if (result.success()) {
+                onSuccess.accept(result.value());
+            }
+        });
+        task.setOnFailed(ignored -> {
+            LOGGER.log(Level.SEVERE, "Inventory operation failed", task.getException());
+            errorLabel.setText("Inventory operation failed");
+        });
+        Thread thread = new Thread(task, threadName);
+        thread.setDaemon(true);
+        thread.start();
     }
 }
