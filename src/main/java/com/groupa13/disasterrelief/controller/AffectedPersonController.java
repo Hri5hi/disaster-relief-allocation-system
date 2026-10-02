@@ -3,6 +3,8 @@ package com.groupa13.disasterrelief.controller;
 import java.util.List;
 
 import com.groupa13.disasterrelief.model.AffectedPerson;
+import com.groupa13.disasterrelief.service.core.ServiceResult;
+import com.groupa13.disasterrelief.service.people.AffectedPersonService;
 import com.groupa13.disasterrelief.util.UserRole;
 import com.groupa13.disasterrelief.util.UserSession;
 import com.groupa13.disasterrelief.util.Utility;
@@ -30,7 +32,9 @@ import javafx.scene.control.cell.PropertyValueFactory;
  * - Zone Coordinators: pre-filtered to zone shelters via UserSession.assignedZoneId
  * - Shelter assignment via dropdown
  *
- * Adapted from: Hostel-Management-System StudentController.java pattern
+ * All database work happens in {@link AffectedPersonService} called from JavaFX
+ * {@link Task}s on background threads. Shelter occupancy is never written here —
+ * the PostgreSQL trigger trg_auto_update_shelter_occupancy owns it.
  */
 public class AffectedPersonController extends Utility {
 
@@ -57,6 +61,11 @@ public class AffectedPersonController extends Utility {
     private ObservableList<AffectedPerson> dataList = FXCollections.observableArrayList();
     private ObservableList<AffectedPerson> searchList = FXCollections.observableArrayList();
 
+    private final AffectedPersonService affectedPersonService = new AffectedPersonService();
+
+    /** Non-null only for ZONE_COORDINATOR sessions; scopes all service calls. */
+    private Integer currentZoneId = null;
+
     @FXML
     public void initialize() {
         // Bind table columns
@@ -68,43 +77,48 @@ public class AffectedPersonController extends Utility {
         colMedicalNeeds.setCellValueFactory(new PropertyValueFactory<>("medicalNeeds"));
         colRegisteredAt.setCellValueFactory(new PropertyValueFactory<>("registeredAt"));
 
-        // Zone Coordinator context filtering:
-        // If the current user is a ZONE_COORDINATOR, only load shelters in their assigned zone
-        // and only show affected persons registered at those shelters.
-        // UserSession session = UserSession.getInstance();
-        // if (session.getRole() == UserRole.ZONE_COORDINATOR) {
-        //     Integer zoneId = session.getAssignedZoneId();
-        //     // Load only zone shelters for the combo
-        //     // Load only affected persons at zone shelters
-        // }
+        personTable.setItems(dataList);
 
-        // TODO: Load shelter list for ComboBox from DB
-        // TODO: Load affected persons list asynchronously
-        /*
-        Task<List<AffectedPerson>> loadTask = new Task<>() {
+        // Zone Coordinator context filtering: only this coordinator's zone.
+        UserSession session = UserSession.getInstance();
+        if (session.getRole() == UserRole.ZONE_COORDINATOR) {
+            this.currentZoneId = session.getAssignedZoneId();
+        }
+
+        // Load shelter list for ComboBox asynchronously
+        Task<List<String>> loadSheltersTask = new Task<>() {
             @Override
-            protected List<AffectedPerson> call() throws Exception {
-                return affectedPersonService.getAllAffectedPersons();
+            protected List<String> call() {
+                return affectedPersonService.getAllSheltersForCombo();
             }
         };
+        loadSheltersTask.setOnSucceeded(e -> shelterCombo.getItems().setAll(loadSheltersTask.getValue()));
+        loadSheltersTask.setOnFailed(e ->
+                errorLabel.setText("Failed to load shelters from database"));
 
+        // Load affected persons asynchronously (zone-scoped for coordinators)
+        Task<ServiceResult<List<AffectedPerson>>> loadTask = new Task<>() {
+            @Override
+            protected ServiceResult<List<AffectedPerson>> call() {
+                return affectedPersonService.getAllAffectedPersons(currentZoneId);
+            }
+        };
         loadTask.setOnSucceeded(e -> {
-            dataList.setAll(loadTask.getValue());
-            personTable.setItems(dataList);
+            ServiceResult<List<AffectedPerson>> result = loadTask.getValue();
+            if (result.success()) {
+                dataList.setAll(result.value());
+                personTable.setItems(dataList);
+            } else {
+                errorLabel.setText(result.message());
+            }
         });
-
         loadTask.setOnFailed(e -> {
-            Throwable ex = loadTask.getException();
-            ex.printStackTrace();
+            e.getSource().getException().printStackTrace();
             errorLabel.setText("Failed to load affected persons from database");
         });
 
-        Thread thread = new Thread(loadTask);
-        thread.setDaemon(true);
-        thread.start();
-        */
-
-        personTable.setItems(dataList);
+        new Thread(loadSheltersTask) {{ setDaemon(true); }}.start();
+        new Thread(loadTask) {{ setDaemon(true); }}.start();
     }
 
     /**
@@ -114,41 +128,52 @@ public class AffectedPersonController extends Utility {
      */
     @FXML
     public void handleRegister(ActionEvent event) {
-        try {
-            errorLabel.setText("");
-            String name = nameField.getText();
-            String contact = contactField.getText();
-            String email = emailField.getText();
-            String shelter = shelterCombo.getValue();
-            String medicalNeeds = medicalNeedsArea.getText();
+        errorLabel.setText("");
+        String name = nameField.getText();
+        String contact = contactField.getText();
+        String email = emailField.getText();
+        String medicalNeeds = medicalNeedsArea.getText();
+        Integer shelterId = parseShelterId(shelterCombo.getValue());
 
-            if (name == null || name.trim().isEmpty()) {
-                errorLabel.setText("Name is required");
+        if (name == null || name.trim().isEmpty()) {
+            errorLabel.setText("Name is required");
+            return;
+        }
+
+        // Validate JSON format for medical_needs
+        if (medicalNeeds != null && !medicalNeeds.trim().isEmpty()) {
+            medicalNeeds = medicalNeeds.trim();
+            if (!medicalNeeds.startsWith("{") || !medicalNeeds.endsWith("}")) {
+                errorLabel.setText("Medical needs must be valid JSON (e.g. {\"conditions\": [\"diabetes\"]})");
                 return;
             }
-
-            // Validate JSON format for medical_needs
-            if (medicalNeeds != null && !medicalNeeds.trim().isEmpty()) {
-                medicalNeeds = medicalNeeds.trim();
-                if (!medicalNeeds.startsWith("{") || !medicalNeeds.endsWith("}")) {
-                    errorLabel.setText("Medical needs must be valid JSON (e.g. {\"conditions\": [\"diabetes\"]})");
-                    return;
-                }
-            }
-
-            // TODO: Call service layer
-            // AffectedPerson ap = affectedPersonService.registerPerson(name, contact, email, shelterId, medicalNeeds);
-            // if (ap != null) {
-            //     dataList.add(0, ap);
-            //     personTable.setItems(dataList);
-            // }
-
-            errorLabel.setText("TODO: Service layer integration pending");
-
-        } catch (Exception e) {
-            errorLabel.setText("Error registering affected person");
-            e.printStackTrace();
         }
+
+        // Final copy captured by the background Task (validation may reassign above)
+        final String medicalNeedsJson = medicalNeeds;
+        Integer zoneId = currentZoneId;
+        Task<ServiceResult<AffectedPerson>> task = new Task<>() {
+            @Override
+            protected ServiceResult<AffectedPerson> call() {
+                return affectedPersonService.register(name, contact, email, medicalNeedsJson,
+                                                      shelterId, zoneId);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            ServiceResult<AffectedPerson> result = task.getValue();
+            if (result.success()) {
+                dataList.add(0, result.value());
+                personTable.setItems(dataList);
+                handleClear(null);
+            } else {
+                errorLabel.setText(result.message());
+            }
+        });
+        task.setOnFailed(e -> {
+            task.getException().printStackTrace();
+            errorLabel.setText("Unexpected error: " + task.getException().getMessage());
+        });
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
 
     /**
@@ -156,37 +181,52 @@ public class AffectedPersonController extends Utility {
      */
     @FXML
     public void handleUpdate(ActionEvent event) {
+        errorLabel.setText("");
+        String personIdText = personIdField.getText();
+        if (personIdText == null || personIdText.trim().isEmpty()) {
+            errorLabel.setText("Person ID is required for update");
+            personTable.setItems(dataList);
+            return;
+        }
+
+        int personId;
         try {
-            errorLabel.setText("");
-            String personIdText = personIdField.getText();
-            if (personIdText == null || personIdText.trim().isEmpty()) {
-                errorLabel.setText("Person ID is required for update");
-                personTable.setItems(dataList);
-                return;
-            }
-            int personId = Integer.parseInt(personIdText);
-
-            String name = nameField.getText().isEmpty() ? null : nameField.getText();
-            String contact = contactField.getText().isEmpty() ? null : contactField.getText();
-            String email = emailField.getText().isEmpty() ? null : emailField.getText();
-            String medicalNeeds = medicalNeedsArea.getText().isEmpty() ? null : medicalNeedsArea.getText();
-
-            // TODO: Call service layer
-            // if (affectedPersonService.updatePerson(personId, name, contact, email, shelterId, medicalNeeds)) {
-            //     dataList.removeIf(ap -> ap.getPersonId() == personId);
-            //     AffectedPerson updated = affectedPersonService.findPersonById(personId);
-            //     dataList.add(0, updated);
-            //     personTable.setItems(dataList);
-            // }
-
-            errorLabel.setText("TODO: Service layer integration pending");
-
+            personId = Integer.parseInt(personIdText.trim());
         } catch (NumberFormatException e) {
             errorLabel.setText("Person ID must be a number");
-        } catch (Exception e) {
-            errorLabel.setText("Error updating affected person");
-            e.printStackTrace();
+            return;
         }
+
+        String name = nameField.getText().isEmpty() ? null : nameField.getText();
+        String contact = contactField.getText().isEmpty() ? null : contactField.getText();
+        String email = emailField.getText().isEmpty() ? null : emailField.getText();
+        String medicalNeeds = medicalNeedsArea.getText().isEmpty() ? null : medicalNeedsArea.getText().trim();
+        Integer shelterId = parseShelterId(shelterCombo.getValue());
+        Integer zoneId = currentZoneId;
+
+        Task<ServiceResult<AffectedPerson>> task = new Task<>() {
+            @Override
+            protected ServiceResult<AffectedPerson> call() {
+                return affectedPersonService.update(personId, name, contact, email, medicalNeeds,
+                                                    shelterId, zoneId);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            ServiceResult<AffectedPerson> result = task.getValue();
+            if (result.success()) {
+                dataList.removeIf(ap -> ap.getPersonId() == personId);
+                dataList.add(0, result.value());
+                personTable.setItems(dataList);
+                handleClear(null);
+            } else {
+                errorLabel.setText(result.message());
+            }
+        });
+        task.setOnFailed(e -> {
+            task.getException().printStackTrace();
+            errorLabel.setText("Unexpected error: " + task.getException().getMessage());
+        });
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
 
     /**
@@ -194,30 +234,44 @@ public class AffectedPersonController extends Utility {
      */
     @FXML
     public void handleDelete(ActionEvent event) {
+        errorLabel.setText("");
+        String personIdText = personIdField.getText();
+        if (personIdText == null || personIdText.trim().isEmpty()) {
+            errorLabel.setText("Person ID is required for deletion");
+            personTable.setItems(dataList);
+            return;
+        }
+
+        int personId;
         try {
-            errorLabel.setText("");
-            String personIdText = personIdField.getText();
-            if (personIdText == null || personIdText.trim().isEmpty()) {
-                errorLabel.setText("Person ID is required for deletion");
-                personTable.setItems(dataList);
-                return;
-            }
-            int personId = Integer.parseInt(personIdText);
-
-            // TODO: Call service layer
-            // if (affectedPersonService.deletePerson(personId)) {
-            //     dataList.removeIf(ap -> ap.getPersonId() == personId);
-            //     personTable.setItems(dataList);
-            // }
-
-            errorLabel.setText("TODO: Service layer integration pending");
-
+            personId = Integer.parseInt(personIdText.trim());
         } catch (NumberFormatException e) {
             errorLabel.setText("Person ID must be a number");
-        } catch (Exception e) {
-            errorLabel.setText("Error removing affected person");
-            e.printStackTrace();
+            return;
         }
+
+        Integer zoneId = currentZoneId;
+        Task<ServiceResult<Void>> task = new Task<>() {
+            @Override
+            protected ServiceResult<Void> call() {
+                return affectedPersonService.delete(personId, zoneId);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            ServiceResult<Void> result = task.getValue();
+            if (result.success()) {
+                dataList.removeIf(ap -> ap.getPersonId() == personId);
+                personTable.setItems(dataList);
+                handleClear(null);
+            } else {
+                errorLabel.setText(result.message());
+            }
+        });
+        task.setOnFailed(e -> {
+            task.getException().printStackTrace();
+            errorLabel.setText("Unexpected error: " + task.getException().getMessage());
+        });
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
 
     /**
@@ -225,34 +279,43 @@ public class AffectedPersonController extends Utility {
      */
     @FXML
     public void handleFind(ActionEvent event) {
+        errorLabel.setText("");
+        String personIdText = personIdField.getText();
+        if (personIdText == null || personIdText.trim().isEmpty()) {
+            errorLabel.setText("Enter Person ID to search");
+            personTable.setItems(dataList);
+            return;
+        }
+
+        int personId;
         try {
-            errorLabel.setText("");
-            String personIdText = personIdField.getText();
-            if (personIdText == null || personIdText.trim().isEmpty()) {
-                errorLabel.setText("Enter Person ID to search");
-                personTable.setItems(dataList);
-                return;
-            }
-            int personId = Integer.parseInt(personIdText);
-
-            // TODO: Call service layer
-            // AffectedPerson ap = affectedPersonService.findPersonById(personId);
-            // if (ap != null) {
-            //     searchList.clear();
-            //     searchList.add(ap);
-            //     personTable.setItems(searchList);
-            // } else {
-            //     errorLabel.setText("Person not found");
-            // }
-
-            errorLabel.setText("TODO: Service layer integration pending");
-
+            personId = Integer.parseInt(personIdText.trim());
         } catch (NumberFormatException e) {
             errorLabel.setText("Person ID must be a number");
-        } catch (Exception e) {
-            errorLabel.setText("Error finding affected person");
-            e.printStackTrace();
+            return;
         }
+
+        Task<ServiceResult<AffectedPerson>> task = new Task<>() {
+            @Override
+            protected ServiceResult<AffectedPerson> call() {
+                return affectedPersonService.findById(personId);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            ServiceResult<AffectedPerson> result = task.getValue();
+            if (result.success()) {
+                searchList.clear();
+                searchList.add(result.value());
+                personTable.setItems(searchList);
+            } else {
+                errorLabel.setText(result.message());
+            }
+        });
+        task.setOnFailed(e -> {
+            task.getException().printStackTrace();
+            errorLabel.setText("Unexpected error: " + task.getException().getMessage());
+        });
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
 
     /**
@@ -260,27 +323,41 @@ public class AffectedPersonController extends Utility {
      */
     @FXML
     public void handleFindByShelter(ActionEvent event) {
-        try {
-            errorLabel.setText("");
-            String shelterSelection = shelterCombo.getValue();
-            if (shelterSelection == null) {
-                errorLabel.setText("Select a shelter first");
-                personTable.setItems(dataList);
-                return;
-            }
-
-            // TODO: Extract shelterId and query
-            // List<AffectedPerson> persons = affectedPersonService.findByShelterId(shelterId);
-            // searchList.clear();
-            // searchList.setAll(persons);
-            // personTable.setItems(searchList);
-
-            errorLabel.setText("TODO: Service layer integration pending");
-
-        } catch (Exception e) {
-            errorLabel.setText("Error finding persons by shelter");
-            e.printStackTrace();
+        errorLabel.setText("");
+        String shelterSelection = shelterCombo.getValue();
+        if (shelterSelection == null) {
+            errorLabel.setText("Select a shelter first");
+            personTable.setItems(dataList);
+            return;
         }
+        Integer shelterId = parseShelterId(shelterSelection);
+        if (shelterId == null) {
+            errorLabel.setText("Select a shelter first");
+            personTable.setItems(dataList);
+            return;
+        }
+
+        Task<ServiceResult<List<AffectedPerson>>> task = new Task<>() {
+            @Override
+            protected ServiceResult<List<AffectedPerson>> call() {
+                return affectedPersonService.findByShelterId(shelterId);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            ServiceResult<List<AffectedPerson>> result = task.getValue();
+            if (result.success()) {
+                searchList.clear();
+                searchList.setAll(result.value());
+                personTable.setItems(searchList);
+            } else {
+                errorLabel.setText(result.message());
+            }
+        });
+        task.setOnFailed(e -> {
+            task.getException().printStackTrace();
+            errorLabel.setText("Unexpected error: " + task.getException().getMessage());
+        });
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
 
     @FXML
@@ -300,5 +377,14 @@ public class AffectedPersonController extends Utility {
     @FXML
     public void goBack(ActionEvent event) {
         changeScene(event, "dashboard", "Dashboard");
+    }
+
+    /**
+     * Extracts integer shelter_id from a ComboBox item formatted as "2 — Central Camp".
+     */
+    private Integer parseShelterId(String selection) {
+        if (selection == null || selection.isBlank()) return null;
+        try { return Integer.parseInt(selection.split(" — ")[0].trim()); }
+        catch (NumberFormatException e) { return null; }
     }
 }

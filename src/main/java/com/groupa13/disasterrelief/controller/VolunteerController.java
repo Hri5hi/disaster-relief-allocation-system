@@ -1,8 +1,13 @@
 package com.groupa13.disasterrelief.controller;
 
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.groupa13.disasterrelief.model.Volunteer;
+import com.groupa13.disasterrelief.service.core.ServiceResult;
+import com.groupa13.disasterrelief.service.people.VolunteerService;
 import com.groupa13.disasterrelief.util.Utility;
 
 import javafx.collections.FXCollections;
@@ -26,7 +31,8 @@ import javafx.scene.control.cell.PropertyValueFactory;
  * - Skill-based search using PostgreSQL TEXT[] array contains operator (@>)
  * - Zone assignment via dropdown
  *
- * Adapted from: Hostel-Management-System StudentController.java pattern
+ * All database work happens in {@link VolunteerService} called from JavaFX
+ * {@link Task}s on background threads. This controller contains no SQL.
  */
 public class VolunteerController extends Utility {
 
@@ -54,6 +60,11 @@ public class VolunteerController extends Utility {
     private ObservableList<Volunteer> dataList = FXCollections.observableArrayList();
     private ObservableList<Volunteer> searchList = FXCollections.observableArrayList();
 
+    private final VolunteerService volunteerService = new VolunteerService();
+
+    /** Tracks ComboBox selections as "zone_id — zone_name" → zone_id. */
+    private final Map<String, Integer> zoneNameToId = new HashMap<>();
+
     @FXML
     public void initialize() {
         // Bind table columns to Volunteer model properties
@@ -61,42 +72,54 @@ public class VolunteerController extends Utility {
         colName.setCellValueFactory(new PropertyValueFactory<>("name"));
         colContact.setCellValueFactory(new PropertyValueFactory<>("contact"));
         colEmail.setCellValueFactory(new PropertyValueFactory<>("email"));
-        colSkills.setCellValueFactory(new PropertyValueFactory<>("skills"));
+        // skills is List<String>; skillsDisplay renders it comma-joined for display
+        colSkills.setCellValueFactory(new PropertyValueFactory<>("skillsDisplay"));
         colAvailability.setCellValueFactory(new PropertyValueFactory<>("availability"));
         colZone.setCellValueFactory(new PropertyValueFactory<>("zoneName"));
 
-        // TODO: Load zone list from DB for the ComboBox
-        // Task<List<Zone>> loadZonesTask = ...
-        // zoneCombo.getItems().addAll(zoneNames);
+        volunteerTable.setItems(dataList);
+
+        // Load zone list for the ComboBox asynchronously
+        Task<List<String>> loadZonesTask = new Task<>() {
+            @Override
+            protected List<String> call() {
+                return volunteerService.getAllZonesForCombo();
+            }
+        };
+        loadZonesTask.setOnSucceeded(e -> {
+            List<String> zones = loadZonesTask.getValue();
+            zoneCombo.getItems().setAll(zones);
+            zoneNameToId.clear();
+            for (String item : zones) {
+                zoneNameToId.put(item, parseZoneId(item));
+            }
+        });
+        loadZonesTask.setOnFailed(e ->
+                errorLabel.setText("Failed to load zones from database"));
 
         // Load all volunteers asynchronously
-        // TODO: Replace with actual DAO/Service call when service layer is ready
-        // Pattern adapted from Hostel StudentController.initialize()
-        /*
-        Task<List<Volunteer>> loadTask = new Task<>() {
+        Task<ServiceResult<List<Volunteer>>> loadVolunteersTask = new Task<>() {
             @Override
-            protected List<Volunteer> call() throws Exception {
+            protected ServiceResult<List<Volunteer>> call() {
                 return volunteerService.getAllVolunteers();
             }
         };
-
-        loadTask.setOnSucceeded(e -> {
-            dataList.setAll(loadTask.getValue());
-            volunteerTable.setItems(dataList);
+        loadVolunteersTask.setOnSucceeded(e -> {
+            ServiceResult<List<Volunteer>> result = loadVolunteersTask.getValue();
+            if (result.success()) {
+                dataList.setAll(result.value());
+                volunteerTable.setItems(dataList);
+            } else {
+                errorLabel.setText(result.message());
+            }
         });
-
-        loadTask.setOnFailed(e -> {
-            Throwable ex = loadTask.getException();
-            ex.printStackTrace();
+        loadVolunteersTask.setOnFailed(e -> {
+            e.getSource().getException().printStackTrace();
             errorLabel.setText("Failed to load volunteers from database");
         });
 
-        Thread thread = new Thread(loadTask);
-        thread.setDaemon(true);
-        thread.start();
-        */
-
-        volunteerTable.setItems(dataList);
+        new Thread(loadZonesTask) {{ setDaemon(true); }}.start();
+        new Thread(loadVolunteersTask) {{ setDaemon(true); }}.start();
     }
 
     /**
@@ -105,74 +128,96 @@ public class VolunteerController extends Utility {
      */
     @FXML
     public void handleAdd(ActionEvent event) {
-        try {
-            errorLabel.setText("");
-            String name = nameField.getText();
-            String contact = contactField.getText();
-            String email = emailField.getText();
-            String skills = skillsField.getText();
-            String availability = availabilityField.getText();
-            String zone = zoneCombo.getValue();
+        errorLabel.setText("");
+        String name = nameField.getText();
+        String contact = contactField.getText();
+        String email = emailField.getText();
 
-            if (name == null || name.trim().isEmpty()) {
-                errorLabel.setText("Name is required");
-                return;
+        List<String> skills = skillsField.getText() == null || skillsField.getText().isBlank()
+            ? List.of()
+            : Arrays.stream(skillsField.getText().split(",")).map(String::trim)
+                    .filter(s -> !s.isEmpty()).toList();
+        String availability = availabilityField.getText() == null || availabilityField.getText().isBlank()
+            ? null : availabilityField.getText().trim();
+        Integer zoneId = parseZoneId(zoneCombo.getValue());
+
+        Task<ServiceResult<Volunteer>> task = new Task<>() {
+            @Override
+            protected ServiceResult<Volunteer> call() {
+                return volunteerService.register(name, contact, email, skills, availability, zoneId);
             }
-
-            // TODO: Call service layer to insert volunteer
-            // Volunteer v = volunteerService.registerVolunteer(name, contact, email, skills, availability, zoneId);
-            // if (v != null) {
-            //     dataList.add(0, v);
-            //     volunteerTable.setItems(dataList);
-            // } else {
-            //     errorLabel.setText("Failed to register volunteer");
-            // }
-
-            errorLabel.setText("TODO: Service layer integration pending (Developer A infrastructure)");
-
-        } catch (Exception e) {
-            errorLabel.setText("Error registering volunteer");
-            e.printStackTrace();
-        }
+        };
+        task.setOnSucceeded(e -> {
+            ServiceResult<Volunteer> result = task.getValue();
+            if (result.success()) {
+                dataList.add(0, result.value());
+                volunteerTable.setItems(dataList);
+                handleClear(null);
+            } else {
+                errorLabel.setText(result.message());
+            }
+        });
+        task.setOnFailed(e -> {
+            task.getException().printStackTrace();
+            errorLabel.setText("Unexpected error: " + task.getException().getMessage());
+        });
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
 
     /**
      * Update an existing volunteer's details.
+     * Blank fields mean "keep existing value" (COALESCE in the DAO).
      */
     @FXML
     public void handleUpdate(ActionEvent event) {
+        errorLabel.setText("");
+        String personIdText = personIdField.getText();
+        if (personIdText == null || personIdText.trim().isEmpty()) {
+            errorLabel.setText("Volunteer ID is required for update");
+            volunteerTable.setItems(dataList);
+            return;
+        }
+
+        int personId;
         try {
-            errorLabel.setText("");
-            String personIdText = personIdField.getText();
-            if (personIdText == null || personIdText.trim().isEmpty()) {
-                errorLabel.setText("Volunteer ID is required for update");
-                volunteerTable.setItems(dataList);
-                return;
-            }
-            int personId = Integer.parseInt(personIdText);
-
-            String name = nameField.getText().isEmpty() ? null : nameField.getText();
-            String contact = contactField.getText().isEmpty() ? null : contactField.getText();
-            String email = emailField.getText().isEmpty() ? null : emailField.getText();
-            String skills = skillsField.getText().isEmpty() ? null : skillsField.getText();
-            String availability = availabilityField.getText().isEmpty() ? null : availabilityField.getText();
-
-            // TODO: Call service layer to update volunteer
-            // if (volunteerService.updateVolunteer(personId, name, contact, email, skills, availability, zoneId)) {
-            //     dataList.removeIf(v -> v.getPersonId() == personId);
-            //     Volunteer updated = volunteerService.findVolunteerById(personId);
-            //     dataList.add(0, updated);
-            //     volunteerTable.setItems(dataList);
-            // }
-
-            errorLabel.setText("TODO: Service layer integration pending");
-
+            personId = Integer.parseInt(personIdText.trim());
         } catch (NumberFormatException e) {
             errorLabel.setText("Volunteer ID must be a number");
-        } catch (Exception e) {
-            errorLabel.setText("Error updating volunteer");
-            e.printStackTrace();
+            return;
         }
+
+        String name = nameField.getText().isEmpty() ? null : nameField.getText();
+        String contact = contactField.getText().isEmpty() ? null : contactField.getText();
+        String email = emailField.getText().isEmpty() ? null : emailField.getText();
+        List<String> skills = skillsField.getText().isEmpty() ? null
+            : Arrays.stream(skillsField.getText().split(",")).map(String::trim)
+                    .filter(s -> !s.isEmpty()).toList();
+        String availability = availabilityField.getText().isEmpty() ? null : availabilityField.getText().trim();
+        Integer zoneId = parseZoneId(zoneCombo.getValue());
+
+        Task<ServiceResult<Volunteer>> task = new Task<>() {
+            @Override
+            protected ServiceResult<Volunteer> call() {
+                return volunteerService.update(personId, name, contact, email, skills,
+                                               availability, zoneId);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            ServiceResult<Volunteer> result = task.getValue();
+            if (result.success()) {
+                dataList.removeIf(v -> v.getPersonId() == personId);
+                dataList.add(0, result.value());
+                volunteerTable.setItems(dataList);
+                handleClear(null);
+            } else {
+                errorLabel.setText(result.message());
+            }
+        });
+        task.setOnFailed(e -> {
+            task.getException().printStackTrace();
+            errorLabel.setText("Unexpected error: " + task.getException().getMessage());
+        });
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
 
     /**
@@ -180,30 +225,43 @@ public class VolunteerController extends Utility {
      */
     @FXML
     public void handleDelete(ActionEvent event) {
+        errorLabel.setText("");
+        String personIdText = personIdField.getText();
+        if (personIdText == null || personIdText.trim().isEmpty()) {
+            errorLabel.setText("Volunteer ID is required for deletion");
+            volunteerTable.setItems(dataList);
+            return;
+        }
+
+        int personId;
         try {
-            errorLabel.setText("");
-            String personIdText = personIdField.getText();
-            if (personIdText == null || personIdText.trim().isEmpty()) {
-                errorLabel.setText("Volunteer ID is required for deletion");
-                volunteerTable.setItems(dataList);
-                return;
-            }
-            int personId = Integer.parseInt(personIdText);
-
-            // TODO: Call service layer to delete volunteer
-            // if (volunteerService.deleteVolunteer(personId)) {
-            //     dataList.removeIf(v -> v.getPersonId() == personId);
-            //     volunteerTable.setItems(dataList);
-            // }
-
-            errorLabel.setText("TODO: Service layer integration pending");
-
+            personId = Integer.parseInt(personIdText.trim());
         } catch (NumberFormatException e) {
             errorLabel.setText("Volunteer ID must be a number");
-        } catch (Exception e) {
-            errorLabel.setText("Error removing volunteer");
-            e.printStackTrace();
+            return;
         }
+
+        Task<ServiceResult<Void>> deleteTask = new Task<>() {
+            @Override
+            protected ServiceResult<Void> call() {
+                return volunteerService.delete(personId);
+            }
+        };
+        deleteTask.setOnSucceeded(e -> {
+            ServiceResult<Void> result = deleteTask.getValue();
+            if (result.success()) {
+                dataList.removeIf(v -> v.getPersonId() == personId);
+                volunteerTable.setItems(dataList);
+                handleClear(null);
+            } else {
+                errorLabel.setText(result.message());
+            }
+        });
+        deleteTask.setOnFailed(e -> {
+            deleteTask.getException().printStackTrace();
+            errorLabel.setText("Unexpected error: " + deleteTask.getException().getMessage());
+        });
+        new Thread(deleteTask) {{ setDaemon(true); }}.start();
     }
 
     /**
@@ -211,34 +269,43 @@ public class VolunteerController extends Utility {
      */
     @FXML
     public void handleFind(ActionEvent event) {
+        errorLabel.setText("");
+        String personIdText = personIdField.getText();
+        if (personIdText == null || personIdText.trim().isEmpty()) {
+            errorLabel.setText("Enter Volunteer ID to search");
+            volunteerTable.setItems(dataList);
+            return;
+        }
+
+        int personId;
         try {
-            errorLabel.setText("");
-            String personIdText = personIdField.getText();
-            if (personIdText == null || personIdText.trim().isEmpty()) {
-                errorLabel.setText("Enter Volunteer ID to search");
-                volunteerTable.setItems(dataList);
-                return;
-            }
-            int personId = Integer.parseInt(personIdText);
-
-            // TODO: Call service layer to find volunteer
-            // Volunteer v = volunteerService.findVolunteerById(personId);
-            // if (v != null) {
-            //     searchList.clear();
-            //     searchList.add(v);
-            //     volunteerTable.setItems(searchList);
-            // } else {
-            //     errorLabel.setText("Volunteer not found");
-            // }
-
-            errorLabel.setText("TODO: Service layer integration pending");
-
+            personId = Integer.parseInt(personIdText.trim());
         } catch (NumberFormatException e) {
             errorLabel.setText("Volunteer ID must be a number");
-        } catch (Exception e) {
-            errorLabel.setText("Error finding volunteer");
-            e.printStackTrace();
+            return;
         }
+
+        Task<ServiceResult<Volunteer>> task = new Task<>() {
+            @Override
+            protected ServiceResult<Volunteer> call() {
+                return volunteerService.findById(personId);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            ServiceResult<Volunteer> result = task.getValue();
+            if (result.success()) {
+                searchList.clear();
+                searchList.add(result.value());
+                volunteerTable.setItems(searchList);
+            } else {
+                errorLabel.setText(result.message());
+            }
+        });
+        task.setOnFailed(e -> {
+            task.getException().printStackTrace();
+            errorLabel.setText("Unexpected error: " + task.getException().getMessage());
+        });
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
 
     /**
@@ -247,27 +314,35 @@ public class VolunteerController extends Utility {
      */
     @FXML
     public void handleSearchBySkill(ActionEvent event) {
-        try {
-            errorLabel.setText("");
-            String skillQuery = skillsField.getText();
-            if (skillQuery == null || skillQuery.trim().isEmpty()) {
-                errorLabel.setText("Enter skill(s) in the Skills field to search");
-                volunteerTable.setItems(dataList);
-                return;
-            }
-
-            // TODO: Call service layer to search by skills
-            // List<Volunteer> results = volunteerService.findVolunteersBySkills(skillQuery.split(","));
-            // searchList.clear();
-            // searchList.setAll(results);
-            // volunteerTable.setItems(searchList);
-
-            errorLabel.setText("TODO: Skill search integration pending — uses TEXT[] @> operator");
-
-        } catch (Exception e) {
-            errorLabel.setText("Error searching by skill");
-            e.printStackTrace();
+        errorLabel.setText("");
+        String skillQuery = skillsField.getText();
+        if (skillQuery == null || skillQuery.trim().isEmpty()) {
+            errorLabel.setText("Enter skill(s) in the Skills field to search");
+            volunteerTable.setItems(dataList);
+            return;
         }
+
+        Task<ServiceResult<List<Volunteer>>> task = new Task<>() {
+            @Override
+            protected ServiceResult<List<Volunteer>> call() {
+                return volunteerService.findBySkills(skillQuery);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            ServiceResult<List<Volunteer>> result = task.getValue();
+            if (result.success()) {
+                searchList.clear();
+                searchList.setAll(result.value());
+                volunteerTable.setItems(searchList);
+            } else {
+                errorLabel.setText(result.message());
+            }
+        });
+        task.setOnFailed(e -> {
+            task.getException().printStackTrace();
+            errorLabel.setText("Unexpected error: " + task.getException().getMessage());
+        });
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
 
     /**
@@ -294,5 +369,14 @@ public class VolunteerController extends Utility {
     @FXML
     public void goBack(ActionEvent event) {
         changeScene(event, "dashboard", "Dashboard");
+    }
+
+    /**
+     * Extracts integer zone_id from a ComboBox item formatted as "3 — Wayanad North".
+     */
+    private Integer parseZoneId(String selection) {
+        if (selection == null || selection.isBlank()) return null;
+        try { return Integer.parseInt(selection.split(" — ")[0].trim()); }
+        catch (NumberFormatException e) { return null; }
     }
 }
