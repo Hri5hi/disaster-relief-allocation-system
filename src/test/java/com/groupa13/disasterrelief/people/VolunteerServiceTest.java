@@ -2,6 +2,7 @@ package com.groupa13.disasterrelief.people;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
@@ -132,6 +133,41 @@ class VolunteerServiceTest {
         assertTrue(blank.message().contains("at least one skill"));
     }
 
+    // ── AC-4 step 5: assigned_zone persisted and mapped via findAll() ─────────
+    //     (exercises VolunteerDao.findAll's LEFT JOIN zones → zoneName mapping)
+
+    @Test
+    void testGetAllVolunteers_zoneAssignment_reflectedInFindAll() throws SQLException {
+        int zoneId = insertZone("Zone North");
+
+        // Volunteer A: assigned to a zone; Volunteer B: unassigned (null zone)
+        ServiceResult<Volunteer> assigned = service.register(
+                "Alice", null, null, List.of("first_aid"), null, zoneId);
+        ServiceResult<Volunteer> unassigned = service.register(
+                "Bob", null, null, List.of("cooking"), null, null);
+        assertTrue(assigned.success());
+        assertTrue(unassigned.success());
+
+        ServiceResult<List<Volunteer>> all = service.getAllVolunteers();
+        assertTrue(all.success());
+        assertEquals(2, all.value().size());
+
+        Volunteer withZone = all.value().stream()
+                .filter(v -> v.getPersonId() == assigned.value().getPersonId())
+                .findFirst().orElseThrow();
+        Volunteer withoutZone = all.value().stream()
+                .filter(v -> v.getPersonId() == unassigned.value().getPersonId())
+                .findFirst().orElseThrow();
+
+        // Volunteer A: zone persisted, zoneName joined from zones table
+        assertEquals(Integer.valueOf(zoneId), withZone.getAssignedZone());
+        assertEquals("Zone North", withZone.getZoneName());
+
+        // Volunteer B: zone stays null, no zone name from LEFT JOIN
+        assertNull(withoutZone.getAssignedZone());
+        assertNull(withoutZone.getZoneName());
+    }
+
     // ── Register → getAll → update → delete round trip ────────────────────────
 
     @Test
@@ -171,6 +207,34 @@ class VolunteerServiceTest {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static int insertZone(String name) throws SQLException {
+        try (Connection connection = dataSource.getConnection()) {
+            int disasterId;
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO disasters (name, type, severity)
+                    VALUES ('Test Disaster', 'flood', 'high')
+                    RETURNING disaster_id
+                    """)) {
+                try (ResultSet rows = statement.executeQuery()) {
+                    assertTrue(rows.next());
+                    disasterId = rows.getInt(1);
+                }
+            }
+            try (PreparedStatement statement = connection.prepareStatement("""
+                    INSERT INTO zones (disaster_id, name, severity)
+                    VALUES (?, ?, 'high')
+                    RETURNING zone_id
+                    """)) {
+                statement.setInt(1, disasterId);
+                statement.setString(2, name);
+                try (ResultSet rows = statement.executeQuery()) {
+                    assertTrue(rows.next());
+                    return rows.getInt(1);
+                }
+            }
+        }
+    }
 
     private static int countVolunteers() throws SQLException {
         try (Connection connection = dataSource.getConnection();
