@@ -9,6 +9,7 @@
 --   $2a$10$HaUWHrSnxmG74qamG.rU/eJgyb57/emdR4f45/JjpeTtdvLD/wfr.
 
 -- ── 1. Seed People for System Accounts ──────────────────────────────────────
+-- people has no external FK dependencies: safe to insert first.
 INSERT INTO people (person_id, name, contact, email)
 VALUES
     (101, 'Chief Coordinator Admin', '+91 98765 00001', 'admin@dras.org'),
@@ -21,21 +22,11 @@ ON CONFLICT (person_id) DO NOTHING;
 -- Reset sequence if needed
 SELECT setval(pg_get_serial_sequence('people', 'person_id'), GREATEST(105, (SELECT COALESCE(MAX(person_id), 1) FROM people)));
 
--- ── 2. Seed Demonstration App Users (5 Roles) ───────────────────────────────
-INSERT INTO app_users (user_id, person_id, username, password_hash, role, assigned_zone_id, is_active)
-VALUES
-    (1, 101, 'admin',           '$2a$10$HaUWHrSnxmG74qamG.rU/eJgyb57/emdR4f45/JjpeTtdvLD/wfr.', 'SYSTEM_ADMIN',          NULL, true),
-    (2, 102, 'zone_coord',      '$2a$10$HaUWHrSnxmG74qamG.rU/eJgyb57/emdR4f45/JjpeTtdvLD/wfr.', 'ZONE_COORDINATOR',      1,    true),
-    (3, 103, 'warehouse_mgr',   '$2a$10$HaUWHrSnxmG74qamG.rU/eJgyb57/emdR4f45/JjpeTtdvLD/wfr.', 'WAREHOUSE_MANAGER',     NULL, true),
-    (4, 104, 'volunteer_coord', '$2a$10$HaUWHrSnxmG74qamG.rU/eJgyb57/emdR4f45/JjpeTtdvLD/wfr.', 'VOLUNTEER_COORDINATOR', NULL, true),
-    (5, 105, 'analytics_user',   '$2a$10$HaUWHrSnxmG74qamG.rU/eJgyb57/emdR4f45/JjpeTtdvLD/wfr.', 'ANALYTICS_USER',       NULL, true)
-ON CONFLICT (username) DO NOTHING;
 
-SELECT setval(pg_get_serial_sequence('app_users', 'user_id'), GREATEST(5, (SELECT COALESCE(MAX(user_id), 1) FROM app_users)));
-
-
--- ── 3. Seed Base Operational Entities (if not present) ──────────────────────
--- Ensure a default disaster, zones, shelters, and resources exist for development
+-- ── 2. Seed Base Operational Entities (if not present) ──────────────────────
+-- ORDERING CONTRACT: disasters → shelters → zones must precede app_users
+-- because zones.disaster_id → disasters and zones.primary_shelter_id → shelters,
+-- and app_users.assigned_zone_id → zones.
 
 INSERT INTO disasters (disaster_id, name, type, severity, active_period, status)
 VALUES (1, 'Kerala Monsoon Floods 2026', 'Flood', 'high'::severity_level, daterange('2026-07-01', '2026-11-30', '[]'), 'active'::disaster_status)
@@ -55,6 +46,27 @@ VALUES
     (3, 1, 'Meppadi High Altitude', 'medium'::severity_level,  3, '+91 98765 00020')
 ON CONFLICT (zone_id) DO NOTHING;
 
+SELECT setval(pg_get_serial_sequence('disasters', 'disaster_id'), GREATEST(1, (SELECT COALESCE(MAX(disaster_id), 1) FROM disasters)));
+SELECT setval(pg_get_serial_sequence('shelters', 'shelter_id'),   GREATEST(3, (SELECT COALESCE(MAX(shelter_id), 1)   FROM shelters)));
+SELECT setval(pg_get_serial_sequence('zones', 'zone_id'),         GREATEST(3, (SELECT COALESCE(MAX(zone_id), 1)      FROM zones)));
+
+
+-- ── 3. Seed Demonstration App Users (5 Roles) ───────────────────────────────
+-- Inserted AFTER zones exist: fk_app_users_assigned_zone (assigned_zone_id → zones.zone_id)
+-- and fk_app_users_person (person_id → people.person_id) are now both satisfiable.
+INSERT INTO app_users (user_id, person_id, username, password_hash, role, assigned_zone_id, is_active)
+VALUES
+    (1, 101, 'admin',           '$2a$10$HaUWHrSnxmG74qamG.rU/eJgyb57/emdR4f45/JjpeTtdvLD/wfr.', 'SYSTEM_ADMIN',          NULL, true),
+    (2, 102, 'zone_coord',      '$2a$10$HaUWHrSnxmG74qamG.rU/eJgyb57/emdR4f45/JjpeTtdvLD/wfr.', 'ZONE_COORDINATOR',      1,    true),
+    (3, 103, 'warehouse_mgr',   '$2a$10$HaUWHrSnxmG74qamG.rU/eJgyb57/emdR4f45/JjpeTtdvLD/wfr.', 'WAREHOUSE_MANAGER',     NULL, true),
+    (4, 104, 'volunteer_coord', '$2a$10$HaUWHrSnxmG74qamG.rU/eJgyb57/emdR4f45/JjpeTtdvLD/wfr.', 'VOLUNTEER_COORDINATOR', NULL, true),
+    (5, 105, 'analytics_user',   '$2a$10$HaUWHrSnxmG74qamG.rU/eJgyb57/emdR4f45/JjpeTtdvLD/wfr.', 'ANALYTICS_USER',       NULL, true)
+ON CONFLICT (username) DO NOTHING;
+
+SELECT setval(pg_get_serial_sequence('app_users', 'user_id'), GREATEST(5, (SELECT COALESCE(MAX(user_id), 1) FROM app_users)));
+
+
+-- ── 4. Seed Resource Categories and Resources ────────────────────────────────
 INSERT INTO resource_categories (category_id, name, parent_id)
 VALUES
     (1, 'Food & Water', NULL),
@@ -72,6 +84,9 @@ VALUES
     (5, 'Paracetamol Tablets 500mg',         2, 'strips')
 ON CONFLICT (resource_id) DO NOTHING;
 
+SELECT setval(pg_get_serial_sequence('resource_categories', 'category_id'), GREATEST(4, (SELECT COALESCE(MAX(category_id), 1) FROM resource_categories)));
+SELECT setval(pg_get_serial_sequence('resources', 'resource_id'),           GREATEST(5, (SELECT COALESCE(MAX(resource_id), 1)  FROM resources)));
+
 -- Seed initial stock in shelter 1 and 2
 INSERT INTO shelter_inventory (shelter_id, resource_id, quantity, reorder_level, last_updated)
 VALUES
@@ -85,7 +100,7 @@ VALUES
 ON CONFLICT (shelter_id, resource_id) DO NOTHING;
 
 
--- ── 4. Seed Operational Resource Requests ───────────────────────────────────
+-- ── 5. Seed Operational Resource Requests ───────────────────────────────────
 INSERT INTO resource_requests (request_id, zone_id, resource_id, destination_shelter_id, quantity_requested, urgency, status, requested_at, fulfilled_at)
 VALUES
     (1, 1, 1, 1, 100, 'critical', 'fulfilled', now() - INTERVAL '2 days', now() - INTERVAL '1 day'),
@@ -98,7 +113,7 @@ ON CONFLICT (request_id) DO NOTHING;
 SELECT setval(pg_get_serial_sequence('resource_requests', 'request_id'), GREATEST(5, (SELECT COALESCE(MAX(request_id), 1) FROM resource_requests)));
 
 
--- ── 5. Seed Historical Distribution Logs ────────────────────────────────────
+-- ── 6. Seed Historical Distribution Logs ────────────────────────────────────
 INSERT INTO distribution_log (log_id, source_shelter, dest_shelter, resource_id, quantity, distributed_at)
 VALUES
     (1, 2, 1, 1, 100, now() - INTERVAL '1 day'),
@@ -106,7 +121,7 @@ VALUES
 ON CONFLICT (log_id, distributed_at) DO NOTHING;
 
 
--- ── 6. Seed Incoming Donation Record ────────────────────────────────────────
+-- ── 7. Seed Incoming Donation Record ────────────────────────────────────────
 INSERT INTO donation_records (donation_id, donor_name, items, receiving_shelter, received_at)
 VALUES
     (1, 'Rotary Club Emergency Relief', '[{"resource_id": 1, "quantity": 50}, {"resource_id": 4, "quantity": 100}]'::JSONB, 1, now() - INTERVAL '12 hours')
@@ -115,6 +130,6 @@ ON CONFLICT (donation_id) DO NOTHING;
 SELECT setval(pg_get_serial_sequence('donation_records', 'donation_id'), GREATEST(1, (SELECT COALESCE(MAX(donation_id), 1) FROM donation_records)));
 
 
--- ── 7. Refresh Materialized Views with Seed Baseline ────────────────────────
+-- ── 8. Refresh Materialized Views with Seed Baseline ────────────────────────
 REFRESH MATERIALIZED VIEW mv_zone_resource_summary;
 REFRESH MATERIALIZED VIEW mv_daily_distribution_stats;
