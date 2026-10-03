@@ -2,8 +2,9 @@ package com.groupa13.disasterrelief.controller;
 
 import java.util.List;
 
-import com.groupa13.disasterrelief.model.Volunteer;
 import com.groupa13.disasterrelief.model.VolunteerShift;
+import com.groupa13.disasterrelief.service.core.ServiceResult;
+import com.groupa13.disasterrelief.service.people.VolunteerShiftService;
 import com.groupa13.disasterrelief.util.Utility;
 
 import javafx.collections.FXCollections;
@@ -27,8 +28,10 @@ import javafx.scene.control.cell.PropertyValueFactory;
  * - DB-level EXCLUDE USING gist constraint prevents overlapping shifts for same volunteer
  * - View shifts by volunteer or by zone
  *
- * Adapted from: Hostel-Management-System AllocationController.java pattern
- * (multi-entity combo loading + CRUD with foreign key lookups)
+ * All database work happens in {@link VolunteerShiftService} called from JavaFX
+ * {@link Task}s on background threads. Overlap detection is delegated entirely to
+ * PostgreSQL's exclusion constraint (SQLState 23P01), which the service maps to a
+ * user-friendly message.
  */
 public class VolunteerShiftController extends Utility {
 
@@ -51,6 +54,8 @@ public class VolunteerShiftController extends Utility {
     private ObservableList<VolunteerShift> dataList = FXCollections.observableArrayList();
     private ObservableList<VolunteerShift> searchList = FXCollections.observableArrayList();
 
+    private final VolunteerShiftService shiftService = new VolunteerShiftService();
+
     @FXML
     public void initialize() {
         // Bind table columns to VolunteerShift model properties
@@ -59,42 +64,53 @@ public class VolunteerShiftController extends Utility {
         colZoneName.setCellValueFactory(new PropertyValueFactory<>("zoneName"));
         colDutyPeriod.setCellValueFactory(new PropertyValueFactory<>("dutyPeriod"));
 
-        // Load combo data + shift list asynchronously
-        // Adapted from Hostel AllocationController pattern (Task<Object[]> for multi-entity load)
-        // TODO: Replace with actual DAO/Service call
-        /*
-        Task<Object[]> loadAllTask = new Task<>() {
+        shiftTable.setItems(dataList);
+
+        // Load volunteer + zone combos and the shift list asynchronously
+        Task<List<String>> loadVolunteersTask = new Task<>() {
             @Override
-            protected Object[] call() throws Exception {
-                List<VolunteerShift> shifts = shiftService.getAllShifts();
-                List<Volunteer> volunteers = volunteerService.getAllVolunteers();
-                List<Zone> zones = zoneService.getAllZones();
-                return new Object[] { shifts, volunteers, zones };
+            protected List<String> call() {
+                return shiftService.getAllVolunteersForCombo();
             }
         };
+        loadVolunteersTask.setOnSucceeded(e ->
+                volunteerCombo.getItems().setAll(loadVolunteersTask.getValue()));
+        loadVolunteersTask.setOnFailed(e ->
+                errorLabel.setText("Failed to load volunteers from database"));
 
-        loadAllTask.setOnSucceeded(e -> {
-            Object[] results = loadAllTask.getValue();
-            List<VolunteerShift> shifts = (List<VolunteerShift>) results[0];
-            List<Volunteer> volunteers = (List<Volunteer>) results[1];
-            // Populate combos with volunteer names/IDs and zone names/IDs
-            // ...
-            dataList.setAll(shifts);
-            shiftTable.setItems(dataList);
+        Task<List<String>> loadZonesTask = new Task<>() {
+            @Override
+            protected List<String> call() {
+                return shiftService.getAllZonesForCombo();
+            }
+        };
+        loadZonesTask.setOnSucceeded(e -> zoneCombo.getItems().setAll(loadZonesTask.getValue()));
+        loadZonesTask.setOnFailed(e ->
+                errorLabel.setText("Failed to load zones from database"));
+
+        Task<ServiceResult<List<VolunteerShift>>> loadShiftsTask = new Task<>() {
+            @Override
+            protected ServiceResult<List<VolunteerShift>> call() {
+                return shiftService.getAllShifts();
+            }
+        };
+        loadShiftsTask.setOnSucceeded(e -> {
+            ServiceResult<List<VolunteerShift>> result = loadShiftsTask.getValue();
+            if (result.success()) {
+                dataList.setAll(result.value());
+                shiftTable.setItems(dataList);
+            } else {
+                errorLabel.setText(result.message());
+            }
         });
-
-        loadAllTask.setOnFailed(e -> {
-            Throwable ex = loadAllTask.getException();
-            ex.printStackTrace();
+        loadShiftsTask.setOnFailed(e -> {
+            e.getSource().getException().printStackTrace();
             errorLabel.setText("Failed to load shift data from database");
         });
 
-        Thread thread = new Thread(loadAllTask);
-        thread.setDaemon(true);
-        thread.start();
-        */
-
-        shiftTable.setItems(dataList);
+        new Thread(loadVolunteersTask) {{ setDaemon(true); }}.start();
+        new Thread(loadZonesTask) {{ setDaemon(true); }}.start();
+        new Thread(loadShiftsTask) {{ setDaemon(true); }}.start();
     }
 
     /**
@@ -104,40 +120,53 @@ public class VolunteerShiftController extends Utility {
      */
     @FXML
     public void handleCreate(ActionEvent event) {
-        try {
-            errorLabel.setText("");
-            String volunteerSelection = volunteerCombo.getValue();
-            String zoneSelection = zoneCombo.getValue();
-            String dutyStart = dutyStartField.getText();
-            String dutyEnd = dutyEndField.getText();
+        errorLabel.setText("");
+        String volunteerSelection = volunteerCombo.getValue();
+        String zoneSelection = zoneCombo.getValue();
+        String dutyStart = dutyStartField.getText();
+        String dutyEnd = dutyEndField.getText();
 
-            if (volunteerSelection == null || zoneSelection == null) {
-                errorLabel.setText("Select both a volunteer and a zone");
-                return;
-            }
-            if (dutyStart == null || dutyStart.isEmpty() || dutyEnd == null || dutyEnd.isEmpty()) {
-                errorLabel.setText("Both duty start and end times are required");
-                return;
-            }
-
-            // Construct tsrange: [dutyStart, dutyEnd)
-            String dutyPeriod = "[" + dutyStart + ", " + dutyEnd + ")";
-
-            // TODO: Call service layer to create shift
-            // VolunteerShift shift = shiftService.createShift(volunteerId, zoneId, dutyPeriod);
-            // if (shift != null) {
-            //     dataList.add(0, shift);
-            //     shiftTable.setItems(dataList);
-            // } else {
-            //     errorLabel.setText("Shift conflicts with existing schedule (exclusion constraint)");
-            // }
-
-            errorLabel.setText("TODO: Service layer integration pending — tsrange: " + dutyPeriod);
-
-        } catch (Exception e) {
-            errorLabel.setText("Error scheduling shift");
-            e.printStackTrace();
+        if (volunteerSelection == null || zoneSelection == null) {
+            errorLabel.setText("Select both a volunteer and a zone");
+            return;
         }
+        if (dutyStart == null || dutyStart.isEmpty() || dutyEnd == null || dutyEnd.isEmpty()) {
+            errorLabel.setText("Both duty start and end times are required");
+            return;
+        }
+
+        Integer volunteerId = parseId(volunteerSelection);
+        Integer zoneId = parseId(zoneSelection);
+        if (volunteerId == null || zoneId == null) {
+            errorLabel.setText("Select both a volunteer and a zone");
+            return;
+        }
+
+        // Construct tsrange: [dutyStart, dutyEnd)
+        String dutyPeriod = "[" + dutyStart.trim() + ", " + dutyEnd.trim() + ")";
+
+        Task<ServiceResult<VolunteerShift>> task = new Task<>() {
+            @Override
+            protected ServiceResult<VolunteerShift> call() {
+                return shiftService.createShift(volunteerId, zoneId, dutyPeriod);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            ServiceResult<VolunteerShift> result = task.getValue();
+            if (result.success()) {
+                dataList.add(0, result.value());
+                shiftTable.setItems(dataList);
+                handleClear(null);
+            } else {
+                // e.g. "Volunteer already has an overlapping shift for this time period"
+                errorLabel.setText(result.message());
+            }
+        });
+        task.setOnFailed(e -> {
+            task.getException().printStackTrace();
+            errorLabel.setText("Unexpected error: " + task.getException().getMessage());
+        });
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
 
     /**
@@ -145,38 +174,52 @@ public class VolunteerShiftController extends Utility {
      */
     @FXML
     public void handleUpdate(ActionEvent event) {
+        errorLabel.setText("");
+        String shiftIdText = shiftIdField.getText();
+        if (shiftIdText == null || shiftIdText.trim().isEmpty()) {
+            errorLabel.setText("Shift ID is required for update");
+            return;
+        }
+
+        int shiftId;
         try {
-            errorLabel.setText("");
-            String shiftIdText = shiftIdField.getText();
-            if (shiftIdText == null || shiftIdText.trim().isEmpty()) {
-                errorLabel.setText("Shift ID is required for update");
-                return;
-            }
-            int shiftId = Integer.parseInt(shiftIdText);
-
-            String dutyStart = dutyStartField.getText();
-            String dutyEnd = dutyEndField.getText();
-            String dutyPeriod = null;
-            if (!dutyStart.isEmpty() && !dutyEnd.isEmpty()) {
-                dutyPeriod = "[" + dutyStart + ", " + dutyEnd + ")";
-            }
-
-            // TODO: Call service layer to update shift
-            // if (shiftService.updateShift(shiftId, zoneId, dutyPeriod) != null) {
-            //     dataList.removeIf(s -> s.getShiftId() == shiftId);
-            //     VolunteerShift updated = shiftService.findShiftById(shiftId);
-            //     dataList.add(0, updated);
-            //     shiftTable.setItems(dataList);
-            // }
-
-            errorLabel.setText("TODO: Service layer integration pending");
-
+            shiftId = Integer.parseInt(shiftIdText.trim());
         } catch (NumberFormatException e) {
             errorLabel.setText("Shift ID must be a number");
-        } catch (Exception e) {
-            errorLabel.setText("Error updating shift");
-            e.printStackTrace();
+            return;
         }
+
+        String dutyStart = dutyStartField.getText();
+        String dutyEnd = dutyEndField.getText();
+        String dutyPeriodValue = null;
+        if (dutyStart != null && dutyEnd != null && !dutyStart.isEmpty() && !dutyEnd.isEmpty()) {
+            dutyPeriodValue = "[" + dutyStart.trim() + ", " + dutyEnd.trim() + ")";
+        }
+        final String dutyPeriod = dutyPeriodValue;
+        Integer zoneId = parseId(zoneCombo.getValue());
+
+        Task<ServiceResult<VolunteerShift>> task = new Task<>() {
+            @Override
+            protected ServiceResult<VolunteerShift> call() {
+                return shiftService.updateShift(shiftId, zoneId, dutyPeriod);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            ServiceResult<VolunteerShift> result = task.getValue();
+            if (result.success()) {
+                dataList.removeIf(s -> s.getShiftId() == shiftId);
+                dataList.add(0, result.value());
+                shiftTable.setItems(dataList);
+                handleClear(null);
+            } else {
+                errorLabel.setText(result.message());
+            }
+        });
+        task.setOnFailed(e -> {
+            task.getException().printStackTrace();
+            errorLabel.setText("Unexpected error: " + task.getException().getMessage());
+        });
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
 
     /**
@@ -184,29 +227,42 @@ public class VolunteerShiftController extends Utility {
      */
     @FXML
     public void handleDelete(ActionEvent event) {
+        errorLabel.setText("");
+        String shiftIdText = shiftIdField.getText();
+        if (shiftIdText == null || shiftIdText.trim().isEmpty()) {
+            errorLabel.setText("Shift ID is required for cancellation");
+            return;
+        }
+
+        int shiftId;
         try {
-            errorLabel.setText("");
-            String shiftIdText = shiftIdField.getText();
-            if (shiftIdText == null || shiftIdText.trim().isEmpty()) {
-                errorLabel.setText("Shift ID is required for cancellation");
-                return;
-            }
-            int shiftId = Integer.parseInt(shiftIdText);
-
-            // TODO: Call service layer to delete shift
-            // if (shiftService.deleteShift(shiftId)) {
-            //     dataList.removeIf(s -> s.getShiftId() == shiftId);
-            //     shiftTable.setItems(dataList);
-            // }
-
-            errorLabel.setText("TODO: Service layer integration pending");
-
+            shiftId = Integer.parseInt(shiftIdText.trim());
         } catch (NumberFormatException e) {
             errorLabel.setText("Shift ID must be a number");
-        } catch (Exception e) {
-            errorLabel.setText("Error cancelling shift");
-            e.printStackTrace();
+            return;
         }
+
+        Task<ServiceResult<Void>> task = new Task<>() {
+            @Override
+            protected ServiceResult<Void> call() {
+                return shiftService.deleteShift(shiftId);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            ServiceResult<Void> result = task.getValue();
+            if (result.success()) {
+                dataList.removeIf(s -> s.getShiftId() == shiftId);
+                shiftTable.setItems(dataList);
+                handleClear(null);
+            } else {
+                errorLabel.setText(result.message());
+            }
+        });
+        task.setOnFailed(e -> {
+            task.getException().printStackTrace();
+            errorLabel.setText("Unexpected error: " + task.getException().getMessage());
+        });
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
 
     /**
@@ -214,32 +270,43 @@ public class VolunteerShiftController extends Utility {
      */
     @FXML
     public void handleFindById(ActionEvent event) {
+        errorLabel.setText("");
+        String shiftIdText = shiftIdField.getText();
+        if (shiftIdText == null || shiftIdText.trim().isEmpty()) {
+            errorLabel.setText("Enter Shift ID to search");
+            shiftTable.setItems(dataList);
+            return;
+        }
+
+        int shiftId;
         try {
-            errorLabel.setText("");
-            String shiftIdText = shiftIdField.getText();
-            if (shiftIdText == null || shiftIdText.trim().isEmpty()) {
-                errorLabel.setText("Enter Shift ID to search");
-                shiftTable.setItems(dataList);
-                return;
-            }
-            int shiftId = Integer.parseInt(shiftIdText);
-
-            // TODO: Call service layer
-            // VolunteerShift shift = shiftService.findShiftById(shiftId);
-            // if (shift != null) {
-            //     searchList.clear();
-            //     searchList.add(shift);
-            //     shiftTable.setItems(searchList);
-            // }
-
-            errorLabel.setText("TODO: Service layer integration pending");
-
+            shiftId = Integer.parseInt(shiftIdText.trim());
         } catch (NumberFormatException e) {
             errorLabel.setText("Shift ID must be a number");
-        } catch (Exception e) {
-            errorLabel.setText("Error finding shift");
-            e.printStackTrace();
+            return;
         }
+
+        Task<ServiceResult<VolunteerShift>> task = new Task<>() {
+            @Override
+            protected ServiceResult<VolunteerShift> call() {
+                return shiftService.findById(shiftId);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            ServiceResult<VolunteerShift> result = task.getValue();
+            if (result.success()) {
+                searchList.clear();
+                searchList.add(result.value());
+                shiftTable.setItems(searchList);
+            } else {
+                errorLabel.setText(result.message());
+            }
+        });
+        task.setOnFailed(e -> {
+            task.getException().printStackTrace();
+            errorLabel.setText("Unexpected error: " + task.getException().getMessage());
+        });
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
 
     /**
@@ -247,27 +314,41 @@ public class VolunteerShiftController extends Utility {
      */
     @FXML
     public void handleFindByVolunteer(ActionEvent event) {
-        try {
-            errorLabel.setText("");
-            String volunteerSelection = volunteerCombo.getValue();
-            if (volunteerSelection == null) {
-                errorLabel.setText("Select a volunteer first");
-                shiftTable.setItems(dataList);
-                return;
-            }
-
-            // TODO: Extract volunteerId from selection and query
-            // List<VolunteerShift> shifts = shiftService.getShiftsByVolunteerId(volunteerId);
-            // searchList.clear();
-            // searchList.setAll(shifts);
-            // shiftTable.setItems(searchList);
-
-            errorLabel.setText("TODO: Service layer integration pending");
-
-        } catch (Exception e) {
-            errorLabel.setText("Error finding volunteer shifts");
-            e.printStackTrace();
+        errorLabel.setText("");
+        String volunteerSelection = volunteerCombo.getValue();
+        if (volunteerSelection == null) {
+            errorLabel.setText("Select a volunteer first");
+            shiftTable.setItems(dataList);
+            return;
         }
+        Integer volunteerId = parseId(volunteerSelection);
+        if (volunteerId == null) {
+            errorLabel.setText("Select a volunteer first");
+            shiftTable.setItems(dataList);
+            return;
+        }
+
+        Task<ServiceResult<List<VolunteerShift>>> task = new Task<>() {
+            @Override
+            protected ServiceResult<List<VolunteerShift>> call() {
+                return shiftService.getShiftsByVolunteerId(volunteerId);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            ServiceResult<List<VolunteerShift>> result = task.getValue();
+            if (result.success()) {
+                searchList.clear();
+                searchList.setAll(result.value());
+                shiftTable.setItems(searchList);
+            } else {
+                errorLabel.setText(result.message());
+            }
+        });
+        task.setOnFailed(e -> {
+            task.getException().printStackTrace();
+            errorLabel.setText("Unexpected error: " + task.getException().getMessage());
+        });
+        new Thread(task) {{ setDaemon(true); }}.start();
     }
 
     /**
@@ -291,5 +372,14 @@ public class VolunteerShiftController extends Utility {
     @FXML
     public void goBack(ActionEvent event) {
         changeScene(event, "dashboard", "Dashboard");
+    }
+
+    /**
+     * Extracts the leading integer ID from a ComboBox item formatted as "3 — Wayanad North".
+     */
+    private Integer parseId(String selection) {
+        if (selection == null || selection.isBlank()) return null;
+        try { return Integer.parseInt(selection.split(" — ")[0].trim()); }
+        catch (NumberFormatException e) { return null; }
     }
 }
