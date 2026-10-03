@@ -12,6 +12,9 @@ public class VolunteerShift {
     private int shiftId;
     private int volunteerId;
     private int zoneId;
+    // JDBC binding: PGobject with type "tsrange" and value equal to this
+    // tsrange literal, e.g. "[2026-07-09 08:00, 2026-07-09 20:00)".
+    // Reading: rs.getString("duty_period") returns PostgreSQL's literal form.
     private String dutyPeriod;    // PostgreSQL tsrange, e.g. "[2026-07-09 08:00, 2026-07-09 20:00)"
     private String volunteerName; // Display-friendly (joined from volunteers)
     private String zoneName;      // Display-friendly (joined from zones)
