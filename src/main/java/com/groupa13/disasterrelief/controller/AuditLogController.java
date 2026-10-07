@@ -172,6 +172,18 @@ public class AuditLogController extends Utility {
     }
 
     @FXML
+    public void handleShowDiff(ActionEvent event) {
+        AuditLog selected = auditTable.getSelectionModel().getSelectedItem();
+        if (selected != null) {
+            oldValuesArea.setText(formatJson(selected.getOldValues()));
+            newValuesArea.setText(formatJson(selected.getNewValues()));
+            errorLabel.setText("");
+        } else {
+            errorLabel.setText("Select a row in the table to display JSON diff");
+        }
+    }
+
+    @FXML
     public void handleClear(ActionEvent event) {
         tableNameCombo.getSelectionModel().select("All");
         operationCombo.getSelectionModel().select("All");

@@ -137,6 +137,11 @@ public class DistributionLogController extends Utility {
     }
 
     @FXML
+    public void handleShowAll(ActionEvent event) {
+        handleClear(event);
+    }
+
+    @FXML
     public void handleClear(ActionEvent event) {
         dateFromField.clear();
         dateToField.clear();
