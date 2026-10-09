@@ -280,6 +280,17 @@ public class DashboardController extends Utility {
         }
     }
 
+    /**
+     * Ends the current desktop session and returns to the sign-in screen.
+     * Authentication records and all operational data remain untouched; this
+     * clears only the in-memory identity/role/zone context used by the UI.
+     */
+    @FXML
+    public void handleLogout(ActionEvent event) {
+        UserSession.getInstance().clear();
+        changeScene(event, "login", "Sign In");
+    }
+
     private final com.groupa13.disasterrelief.service.operations.AnalyticsService analyticsService;
 
     public DashboardController() {

@@ -396,6 +396,30 @@
     -fx-border-color: #93c5fd;
 }
 
+/* Dashboard session control — available to every role, without competing
+   with the page's primary navigation actions. */
+.btn-logout {
+    -fx-background-color: rgba(239, 68, 68, 0.12);
+    -fx-text-fill: #fca5a5;
+    -fx-border-color: rgba(248, 113, 113, 0.7);
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 7 13 7 13;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+}
+
+.btn-logout:hover {
+    -fx-background-color: rgba(239, 68, 68, 0.24);
+    -fx-text-fill: #ffffff;
+    -fx-border-color: #f87171;
+}
+
+.btn-logout:pressed {
+    -fx-background-color: rgba(185, 28, 28, 0.34);
+}
+
 /* ── Nav button — large dashboard navigation ── */
 .btn-nav {
     -fx-background-color: #3b82f6;
@@ -954,5 +978,360 @@
     -fx-border-style: dashed;
     -fx-opacity: 0.7;
     -fx-cursor: default;
+}
+
+
+/* ==========================================================================
+   16. RESPONSIVE OPERATIONS WORKSPACES — people registration and analytics
+   ========================================================================== */
+
+.workspace-root {
+    -fx-background-color: linear-gradient(to bottom right, #0b1220, #0f1b2e 58%, #0b1220);
+}
+
+.screen-header {
+    -fx-padding: 15 22 15 22;
+}
+
+.screen-title {
+    -fx-padding: 0;
+    -fx-text-alignment: left;
+}
+
+.screen-subtitle {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 12px;
+}
+
+.workspace-split {
+    -fx-background-color: transparent;
+    -fx-padding: 18;
+}
+
+.workspace-split > .split-pane-divider {
+    -fx-background-color: transparent;
+    -fx-padding: 0 6 0 6;
+}
+
+.workspace-scroll {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+
+.workspace-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.workspace-card {
+    -fx-padding: 20;
+    -fx-spacing: 7;
+}
+
+.workspace-card .text-area .content {
+    -fx-background-color: #273449;
+}
+
+.category-panel {
+    -fx-padding: 20;
+}
+
+.category-tree {
+    -fx-background-color: #162235;
+    -fx-control-inner-background: #162235;
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-border-radius: 9;
+    -fx-background-radius: 9;
+    -fx-padding: 5;
+}
+
+.category-tree .virtual-flow .clipped-container .sheet,
+.category-tree .tree-cell {
+    -fx-background-color: #162235;
+}
+
+.category-tree .tree-cell {
+    -fx-text-fill: #cbd5e1;
+    -fx-font-size: 12px;
+    -fx-padding: 6 7 6 7;
+}
+
+.category-tree .tree-cell:filled:hover {
+    -fx-background-color: #22324a;
+}
+
+.category-tree .tree-cell:filled:selected {
+    -fx-background-color: #1e3a5f;
+    -fx-text-fill: #e0f2fe;
+}
+
+.category-tree .tree-disclosure-node > .arrow {
+    -fx-background-color: #94a3b8;
+}
+
+.resource-form-card {
+    -fx-padding: 20;
+}
+
+.records-panel {
+    -fx-background-color: rgba(30, 41, 59, 0.94);
+}
+
+.panel-heading-row {
+    -fx-padding: 0 0 5 0;
+}
+
+.panel-heading-icon {
+    -fx-icon-size: 18px;
+    -fx-icon-color: #38bdf8;
+}
+
+.warning-icon {
+    -fx-icon-color: #f59e0b;
+}
+
+.panel-title {
+    -fx-font-size: 17px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #f8fafc;
+}
+
+.panel-description {
+    -fx-font-size: 12px;
+    -fx-text-fill: #94a3b8;
+}
+
+.field-helper {
+    -fx-font-size: 10px;
+    -fx-text-fill: #718096;
+    -fx-padding: 0 2 2 2;
+}
+
+.form-section-label {
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #64748b;
+    -fx-padding: 2 0 2 2;
+}
+
+.feedback-label {
+    -fx-padding: 2 8 2 8;
+}
+
+.data-badge {
+    -fx-background-color: rgba(56, 189, 248, 0.11);
+    -fx-border-color: rgba(56, 189, 248, 0.55);
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+    -fx-padding: 4 9 4 9;
+    -fx-font-size: 9px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #7dd3fc;
+}
+
+.warning-badge {
+    -fx-background-color: rgba(245, 158, 11, 0.11);
+    -fx-border-color: rgba(245, 158, 11, 0.55);
+    -fx-text-fill: #fbbf24;
+}
+
+.info-banner {
+    -fx-background-color: rgba(14, 165, 233, 0.08);
+    -fx-border-color: rgba(56, 189, 248, 0.28);
+    -fx-border-width: 1;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 10 12 10 12;
+}
+
+.info-banner-icon {
+    -fx-icon-size: 14px;
+    -fx-icon-color: #38bdf8;
+}
+
+.info-banner-text {
+    -fx-font-size: 11px;
+    -fx-text-fill: #bae6fd;
+}
+
+.records-table {
+    -fx-background-insets: 0;
+}
+
+.records-table .table-row-cell .table-cell.status-critical,
+.records-table .table-row-cell .table-cell.deficit-positive {
+    -fx-text-fill: #fb7185;
+    -fx-font-weight: bold;
+}
+
+.records-table .table-row-cell .table-cell.status-high {
+    -fx-text-fill: #fb923c;
+    -fx-font-weight: bold;
+}
+
+.records-table .table-row-cell .table-cell.status-medium {
+    -fx-text-fill: #facc15;
+    -fx-font-weight: bold;
+}
+
+.records-table .table-row-cell .table-cell.status-low,
+.records-table .table-row-cell .table-cell.deficit-clear {
+    -fx-text-fill: #4ade80;
+    -fx-font-weight: bold;
+}
+
+.analytics-header {
+    -fx-padding: 14 22 14 22;
+}
+
+.filter-surface {
+    -fx-background-color: rgba(30, 41, 59, 0.72);
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+}
+
+.filter-icon {
+    -fx-icon-size: 15px;
+    -fx-icon-color: #38bdf8;
+}
+
+.filter-title {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #e2e8f0;
+}
+
+.filter-description {
+    -fx-font-size: 10px;
+    -fx-text-fill: #64748b;
+}
+
+.analytics-refresh {
+    -fx-padding: 9 15 9 15;
+}
+
+.analytics-content {
+    -fx-background-color: transparent;
+}
+
+.analytics-tabs {
+    -fx-background-color: transparent;
+    -fx-tab-min-width: 132px;
+    -fx-tab-min-height: 38px;
+}
+
+.analytics-tabs > .tab-header-area {
+    -fx-padding: 0 0 8 0;
+}
+
+.analytics-tabs > .tab-header-area > .tab-header-background {
+    -fx-background-color: transparent;
+}
+
+.analytics-tabs > .tab-header-area > .headers-region > .tab {
+    -fx-background-color: #172337;
+    -fx-background-radius: 8 8 0 0;
+    -fx-border-color: #334155;
+    -fx-border-width: 1 1 0 1;
+    -fx-border-radius: 8 8 0 0;
+    -fx-padding: 7 13 7 13;
+}
+
+.analytics-tabs > .tab-header-area > .headers-region > .tab:hover {
+    -fx-background-color: #213149;
+}
+
+.analytics-tabs > .tab-header-area > .headers-region > .tab:selected {
+    -fx-background-color: #1e3a5f;
+    -fx-border-color: #38bdf8 #38bdf8 transparent #38bdf8;
+}
+
+.analytics-tabs > .tab-header-area > .headers-region > .tab .tab-label {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.analytics-tabs > .tab-header-area > .headers-region > .tab:selected .tab-label {
+    -fx-text-fill: #e0f2fe;
+}
+
+.analytics-tabs > .tab-content-area {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.analytics-panel {
+    -fx-background-color: rgba(30, 41, 59, 0.94);
+    -fx-border-color: #334155;
+    -fx-border-width: 1;
+    -fx-border-radius: 0 12 12 12;
+    -fx-background-radius: 0 12 12 12;
+    -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.28), 14, 0.18, 0, 4);
+}
+
+.analytics-chart {
+    -fx-background-color: transparent;
+    -fx-padding: 8;
+}
+
+.analytics-chart .chart-title {
+    -fx-text-fill: #e2e8f0;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+.analytics-chart .chart-plot-background {
+    -fx-background-color: rgba(15, 23, 42, 0.72);
+    -fx-background-radius: 8;
+}
+
+.analytics-chart .chart-vertical-grid-lines,
+.analytics-chart .chart-horizontal-grid-lines {
+    -fx-stroke: rgba(100, 116, 139, 0.22);
+}
+
+.analytics-chart .axis-label,
+.analytics-chart .axis .tick-label,
+.analytics-chart .chart-pie-label,
+.analytics-chart .chart-legend-item {
+    -fx-text-fill: #94a3b8;
+}
+
+.analytics-chart .axis .tick-label,
+.analytics-chart .chart-pie-label {
+    -fx-fill: #94a3b8;
+}
+
+.analytics-chart .axis {
+    -fx-tick-label-fill: #94a3b8;
+}
+
+.analytics-chart .chart-pie-label-line {
+    -fx-stroke: #64748b;
+}
+
+.analytics-chart .axis-tick-mark,
+.analytics-chart .axis-minor-tick-mark {
+    -fx-stroke: #475569;
+}
+
+.analytics-chart .default-color0.chart-bar {
+    -fx-bar-fill: #38bdf8;
+}
+
+.analytics-chart .default-color0.chart-series-line {
+    -fx-stroke: #38bdf8;
+    -fx-stroke-width: 2.5px;
+}
+
+.analytics-chart .default-color0.chart-line-symbol {
+    -fx-background-color: #38bdf8, #0f172a;
+}
+
+.analytics-chart .chart-legend {
+    -fx-background-color: transparent;
 }
 

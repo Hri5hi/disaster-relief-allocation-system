@@ -46,6 +46,8 @@ public class AffectedPersonController extends Utility {
     @FXML private ComboBox<String> shelterCombo;
     @FXML private TextArea medicalNeedsArea;
     @FXML private Label errorLabel;
+    @FXML private Label pageTitleLabel;
+    @FXML private Label pageSubtitleLabel;
     @FXML private Label roleBadge;
 
     // --- Table ---
@@ -77,12 +79,24 @@ public class AffectedPersonController extends Utility {
         colMedicalNeeds.setCellValueFactory(new PropertyValueFactory<>("medicalNeeds"));
         colRegisteredAt.setCellValueFactory(new PropertyValueFactory<>("registeredAt"));
 
+        personTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         personTable.setItems(dataList);
 
         // Zone Coordinator context filtering: only this coordinator's zone.
         UserSession session = UserSession.getInstance();
         if (session.getRole() == UserRole.ZONE_COORDINATOR) {
             this.currentZoneId = session.getAssignedZoneId();
+            applyRoleContext(
+                    "Register Displaced Persons",
+                    "Register people and manage shelter placement within your assigned zone.",
+                    "ZONE SCOPED",
+                    "role-badge-zone");
+        } else {
+            applyRoleContext(
+                    "Affected Person Registration",
+                    "Register people, capture medical needs, and manage shelter placement.",
+                    "SYSTEM ADMIN",
+                    "role-badge-admin");
         }
 
         // Load shelter list for ComboBox asynchronously
@@ -119,6 +133,17 @@ public class AffectedPersonController extends Utility {
 
         new Thread(loadSheltersTask) {{ setDaemon(true); }}.start();
         new Thread(loadTask) {{ setDaemon(true); }}.start();
+    }
+
+    /** Applies presentation-only role context without changing data permissions. */
+    private void applyRoleContext(String title, String subtitle, String badgeText,
+                                  String badgeStyleClass) {
+        pageTitleLabel.setText(title);
+        pageSubtitleLabel.setText(subtitle);
+        roleBadge.setText(badgeText);
+        roleBadge.getStyleClass().removeAll(
+                "role-badge-admin", "role-badge-zone", "role-badge-analytics");
+        roleBadge.getStyleClass().add(badgeStyleClass);
     }
 
     /**

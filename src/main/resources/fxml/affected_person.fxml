@@ -6,139 +6,193 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <!-- Displaced Person Registration
      Target Roles: Zone Coordinator, System Admin
      Key Features: JSONB medical needs text area, shelter assignment,
-                   zone-context filtering for Zone Coordinators
-     Layout: Adapted from Hostel-Management-System student.fxml pattern -->
-<BorderPane minHeight="600.0" minWidth="900.0" prefHeight="850.0" prefWidth="1200.0"
+                   zone-context filtering for Zone Coordinators -->
+<BorderPane minHeight="620.0" minWidth="860.0" prefHeight="850.0" prefWidth="1200.0"
+            styleClass="workspace-root"
             xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.groupa13.disasterrelief.controller.AffectedPersonController">
    <top>
-      <HBox alignment="CENTER_LEFT" minHeight="72.0" spacing="20.0" styleClass="header-bar" BorderPane.alignment="CENTER">
-         <padding>
-            <Insets bottom="12.0" left="16.0" right="16.0" top="12.0" />
-         </padding>
+      <VBox minHeight="94.0" spacing="0.0" styleClass="header-bar, screen-header" BorderPane.alignment="CENTER">
          <children>
-            <Button mnemonicParsing="false" onAction="#goBack" styleClass="btn-back" text="Dashboard">
-               <graphic>
-                  <FontIcon iconLiteral="fas-arrow-left" styleClass="icon-sm" />
-               </graphic>
-            </Button>
-            <Label styleClass="page-title" text="Affected Person Registration" />
-            <Label fx:id="roleBadge" styleClass="role-badge-zone" text="" />
-         </children>
-      </HBox>
-   </top>
-   <left>
-      <ScrollPane fitToHeight="true" fitToWidth="true" hbarPolicy="NEVER" maxWidth="420.0" minWidth="280.0" prefWidth="380.0" vbarPolicy="AS_NEEDED" BorderPane.alignment="CENTER">
-         <content>
-            <VBox minWidth="280.0" spacing="4.0" styleClass="form-panel panel-card">
-               <padding>
-                  <Insets bottom="40.0" left="12.0" right="12.0" top="12.0" />
-               </padding>
+            <HBox alignment="CENTER_LEFT" spacing="16.0">
                <children>
-                  <Label fx:id="errorLabel" maxWidth="1.7976931348623157E308" minHeight="18.0" styleClass="login-error" text="" wrapText="true" />
-
-                  <Label styleClass="field-label" text="Person ID" />
-                  <TextField fx:id="personIdField" promptText="Auto-generated on registration" />
-
-                  <Label styleClass="field-label" text="Name" />
-                  <TextField fx:id="nameField" promptText="Full name" />
-
-                  <Label styleClass="field-label" text="Contact" />
-                  <TextField fx:id="contactField" promptText="Phone number" />
-
-                  <Label styleClass="field-label" text="Email" />
-                  <TextField fx:id="emailField" promptText="Email address (optional)" />
-
-                  <!-- Shelter assignment -->
-                  <Label styleClass="field-label" text="Shelter" />
-                  <ComboBox fx:id="shelterCombo" maxWidth="1.7976931348623157E308" promptText="Assign to shelter..." />
-
-                  <!-- Medical Needs — PostgreSQL JSONB input -->
-                  <Label styleClass="field-label" text="Medical Needs (JSON)" />
-                  <TextArea fx:id="medicalNeedsArea" prefHeight="100.0" prefWidth="200.0"
-                            promptText='{"conditions": ["diabetes"], "wheelchair": true, "medication": "insulin"}'
-                            wrapText="true" />
-
-                  <Separator prefWidth="200.0" />
-
-                  <!-- CRUD Buttons -->
-                  <HBox minHeight="48.0" spacing="8.0">
+                  <Button mnemonicParsing="false" onAction="#goBack" styleClass="btn-back" text="Dashboard">
+                     <graphic>
+                        <FontIcon iconLiteral="fas-arrow-left" styleClass="icon-sm" />
+                     </graphic>
+                  </Button>
+                  <VBox spacing="2.0">
                      <children>
-                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleRegister" styleClass="btn-primary" text="Register" HBox.hgrow="ALWAYS">
-                           <graphic>
-                              <FontIcon iconLiteral="fas-user-plus" styleClass="icon-sm" />
-                           </graphic>
-                        </Button>
-                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleUpdate" styleClass="btn-success" text="Update" HBox.hgrow="ALWAYS">
-                           <graphic>
-                              <FontIcon iconLiteral="fas-user-edit" styleClass="icon-sm" />
-                           </graphic>
-                        </Button>
+                        <Label fx:id="pageTitleLabel" styleClass="page-title, screen-title" text="Affected Person Registration" />
+                        <Label fx:id="pageSubtitleLabel" styleClass="screen-subtitle" text="Register people, capture medical needs, and manage shelter placement." wrapText="true" />
                      </children>
-                  </HBox>
-                  <HBox minHeight="48.0" spacing="8.0">
-                     <children>
-                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleDelete" styleClass="btn-danger" text="Remove" HBox.hgrow="ALWAYS">
-                           <graphic>
-                              <FontIcon iconLiteral="fas-user-times" styleClass="icon-sm" />
-                           </graphic>
-                        </Button>
-                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleFind" styleClass="btn-neutral" text="Find" HBox.hgrow="ALWAYS">
-                           <graphic>
-                              <FontIcon iconLiteral="fas-search" styleClass="icon-sm" />
-                           </graphic>
-                        </Button>
-                     </children>
-                  </HBox>
-                  <HBox minHeight="48.0" spacing="8.0">
-                     <children>
-                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleFindByShelter" styleClass="btn-neutral" text="View by Shelter" HBox.hgrow="ALWAYS">
-                           <graphic>
-                              <FontIcon iconLiteral="fas-home" styleClass="icon-sm" />
-                           </graphic>
-                        </Button>
-                        <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleClear" styleClass="btn-outline" text="Clear" HBox.hgrow="ALWAYS">
-                           <graphic>
-                              <FontIcon iconLiteral="fas-eraser" styleClass="icon-sm" />
-                           </graphic>
-                        </Button>
-                     </children>
-                  </HBox>
+                  </VBox>
+                  <Region HBox.hgrow="ALWAYS" />
+                  <Label fx:id="roleBadge" styleClass="role-badge-admin" text="SYSTEM ADMIN" />
                </children>
-            </VBox>
-         </content>
-      </ScrollPane>
-   </left>
-   <center>
-      <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" spacing="10.0" styleClass="content-area panel-card" BorderPane.alignment="CENTER">
-         <padding>
-            <Insets bottom="24.0" left="16.0" right="16.0" top="16.0" />
-         </padding>
-         <children>
-            <TableView fx:id="personTable" minHeight="200.0" minWidth="400.0" VBox.vgrow="ALWAYS">
-               <columns>
-                  <TableColumn fx:id="colPersonId" minWidth="64.0" prefWidth="70.0" text="ID" />
-                  <TableColumn fx:id="colName" minWidth="100.0" prefWidth="150.0" text="Name" />
-                  <TableColumn fx:id="colContact" minWidth="90.0" prefWidth="120.0" text="Contact" />
-                  <TableColumn fx:id="colEmail" minWidth="120.0" prefWidth="160.0" text="Email" />
-                  <TableColumn fx:id="colShelter" minWidth="120.0" prefWidth="160.0" text="Shelter" />
-                  <TableColumn fx:id="colMedicalNeeds" minWidth="180.0" prefWidth="260.0" text="Medical Needs (JSONB)" />
-                  <TableColumn fx:id="colRegisteredAt" minWidth="130.0" prefWidth="160.0" text="Registered At" />
-               </columns>
-            </TableView>
+            </HBox>
          </children>
       </VBox>
+   </top>
+   <center>
+      <SplitPane dividerPositions="0.355" styleClass="workspace-split" BorderPane.alignment="CENTER">
+         <items>
+            <ScrollPane fitToWidth="true" hbarPolicy="NEVER" minWidth="320.0" prefWidth="390.0"
+                        styleClass="workspace-scroll" vbarPolicy="AS_NEEDED">
+               <content>
+                  <VBox minWidth="300.0" spacing="7.0" styleClass="form-panel, workspace-card">
+                     <children>
+                        <HBox alignment="CENTER_LEFT" spacing="10.0" styleClass="panel-heading-row">
+                           <children>
+                              <FontIcon iconLiteral="fas-user-plus" styleClass="panel-heading-icon" />
+                              <VBox spacing="2.0">
+                                 <children>
+                                    <Label styleClass="panel-title" text="Person details" />
+                                    <Label styleClass="panel-description" text="Required fields are validated before saving." wrapText="true" />
+                                 </children>
+                              </VBox>
+                           </children>
+                        </HBox>
+
+                        <Label fx:id="errorLabel" maxWidth="1.7976931348623157E308" minHeight="0.0"
+                               styleClass="login-error, feedback-label" text="" wrapText="true" />
+
+                        <Label styleClass="field-label" text="Person ID" />
+                        <TextField fx:id="personIdField" promptText="Auto-generated on registration" />
+                        <Label styleClass="field-helper" text="Use the ID for find, update, or remove actions." wrapText="true" />
+
+                        <Label styleClass="field-label" text="Full name *" />
+                        <TextField fx:id="nameField" promptText="Enter the person's full name" />
+
+                        <HBox spacing="10.0">
+                           <children>
+                              <VBox spacing="2.0" HBox.hgrow="ALWAYS">
+                                 <children>
+                                    <Label styleClass="field-label" text="Contact" />
+                                    <TextField fx:id="contactField" maxWidth="1.7976931348623157E308" promptText="Phone number" />
+                                 </children>
+                              </VBox>
+                              <VBox spacing="2.0" HBox.hgrow="ALWAYS">
+                                 <children>
+                                    <Label styleClass="field-label" text="Email" />
+                                    <TextField fx:id="emailField" maxWidth="1.7976931348623157E308" promptText="Optional email" />
+                                 </children>
+                              </VBox>
+                           </children>
+                        </HBox>
+
+                        <Label styleClass="field-label" text="Shelter assignment" />
+                        <ComboBox fx:id="shelterCombo" maxWidth="1.7976931348623157E308" promptText="Select a shelter..." />
+                        <Label styleClass="field-helper" text="Occupancy is updated automatically when the assignment changes." wrapText="true" />
+
+                        <Label styleClass="field-label" text="Medical needs (JSON)" />
+                        <TextArea fx:id="medicalNeedsArea" prefHeight="96.0"
+                                  promptText='{"conditions": ["diabetes"], "wheelchair": true}'
+                                  wrapText="true" />
+                        <Label styleClass="field-helper" text='Example: {"conditions": ["diabetes"], "medication": "insulin"}' wrapText="true" />
+
+                        <Separator prefWidth="200.0" />
+                        <Label styleClass="form-section-label" text="RECORD ACTIONS" />
+
+                        <HBox minHeight="44.0" spacing="8.0">
+                           <children>
+                              <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleRegister"
+                                      styleClass="btn-primary" text="Register" HBox.hgrow="ALWAYS">
+                                 <graphic><FontIcon iconLiteral="fas-user-plus" styleClass="icon-sm" /></graphic>
+                              </Button>
+                              <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleUpdate"
+                                      styleClass="btn-success" text="Update" HBox.hgrow="ALWAYS">
+                                 <graphic><FontIcon iconLiteral="fas-user-edit" styleClass="icon-sm" /></graphic>
+                              </Button>
+                           </children>
+                        </HBox>
+                        <HBox minHeight="44.0" spacing="8.0">
+                           <children>
+                              <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleDelete"
+                                      styleClass="btn-danger" text="Remove" HBox.hgrow="ALWAYS">
+                                 <graphic><FontIcon iconLiteral="fas-user-times" styleClass="icon-sm" /></graphic>
+                              </Button>
+                              <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleFind"
+                                      styleClass="btn-neutral" text="Find by ID" HBox.hgrow="ALWAYS">
+                                 <graphic><FontIcon iconLiteral="fas-search" styleClass="icon-sm" /></graphic>
+                              </Button>
+                           </children>
+                        </HBox>
+                        <HBox minHeight="44.0" spacing="8.0">
+                           <children>
+                              <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleFindByShelter"
+                                      styleClass="btn-neutral" text="View by Shelter" HBox.hgrow="ALWAYS">
+                                 <graphic><FontIcon iconLiteral="fas-home" styleClass="icon-sm" /></graphic>
+                              </Button>
+                              <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleClear"
+                                      styleClass="btn-outline" text="Clear" HBox.hgrow="ALWAYS">
+                                 <graphic><FontIcon iconLiteral="fas-eraser" styleClass="icon-sm" /></graphic>
+                              </Button>
+                           </children>
+                        </HBox>
+                     </children>
+                  </VBox>
+               </content>
+            </ScrollPane>
+
+            <VBox minWidth="480.0" spacing="14.0" styleClass="content-area, panel-card, records-panel">
+               <children>
+                  <HBox alignment="CENTER_LEFT" spacing="10.0">
+                     <children>
+                        <FontIcon iconLiteral="fas-users" styleClass="panel-heading-icon" />
+                        <VBox spacing="2.0">
+                           <children>
+                              <Label styleClass="panel-title" text="Registered displaced persons" />
+                              <Label styleClass="panel-description" text="Select a row to review current shelter and medical details." wrapText="true" />
+                           </children>
+                        </VBox>
+                        <Region HBox.hgrow="ALWAYS" />
+                        <Label styleClass="data-badge" text="LIVE RECORDS" />
+                     </children>
+                  </HBox>
+
+                  <HBox alignment="CENTER_LEFT" spacing="9.0" styleClass="info-banner">
+                     <children>
+                        <FontIcon iconLiteral="fas-shield-alt" styleClass="info-banner-icon" />
+                        <Label maxWidth="1.7976931348623157E308"
+                               styleClass="info-banner-text"
+                               text="Shelter occupancy is database-managed and stays synchronized after registration, reassignment, or removal."
+                               wrapText="true" HBox.hgrow="ALWAYS" />
+                     </children>
+                  </HBox>
+
+                  <TableView fx:id="personTable" minHeight="260.0" minWidth="440.0"
+                             styleClass="records-table" VBox.vgrow="ALWAYS">
+                     <columns>
+                        <TableColumn fx:id="colPersonId" minWidth="64.0" prefWidth="72.0" text="ID" />
+                        <TableColumn fx:id="colName" minWidth="130.0" prefWidth="170.0" text="Name" />
+                        <TableColumn fx:id="colContact" minWidth="105.0" prefWidth="130.0" text="Contact" />
+                        <TableColumn fx:id="colEmail" minWidth="140.0" prefWidth="180.0" text="Email" />
+                        <TableColumn fx:id="colShelter" minWidth="150.0" prefWidth="190.0" text="Shelter" />
+                        <TableColumn fx:id="colMedicalNeeds" minWidth="190.0" prefWidth="270.0" text="Medical Needs" />
+                        <TableColumn fx:id="colRegisteredAt" minWidth="140.0" prefWidth="170.0" text="Registered At" />
+                     </columns>
+                  </TableView>
+               </children>
+               <padding>
+                  <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
+               </padding>
+            </VBox>
+         </items>
+      </SplitPane>
    </center>
 </BorderPane>

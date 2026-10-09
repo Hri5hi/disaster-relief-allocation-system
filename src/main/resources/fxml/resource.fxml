@@ -4,146 +4,201 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.control.TreeView?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane minHeight="600.0" minWidth="1040.0" prefHeight="850.0" prefWidth="1250.0" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.groupa13.disasterrelief.controller.ResourceController">
+<BorderPane minHeight="640.0" minWidth="900.0" prefHeight="850.0" prefWidth="1250.0"
+            styleClass="workspace-root"
+            xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.groupa13.disasterrelief.controller.ResourceController">
    <top>
-      <HBox alignment="CENTER_LEFT" minHeight="72.0" spacing="20.0" styleClass="header-bar" BorderPane.alignment="CENTER">
-         <padding>
-            <Insets bottom="12.0" left="16.0" right="16.0" top="12.0" />
-         </padding>
+      <VBox minHeight="94.0" spacing="0.0" styleClass="header-bar, screen-header" BorderPane.alignment="CENTER">
          <children>
-            <Button mnemonicParsing="false" onAction="#goBack" styleClass="btn-back" text="Dashboard">
-               <graphic>
-                  <FontIcon iconLiteral="fas-arrow-left" styleClass="icon-sm" />
-               </graphic>
-            </Button>
-            <Label styleClass="page-title" text="Resource Master &amp; Categories" />
-         </children>
-      </HBox>
-   </top>
-   <left>
-      <VBox maxHeight="1.7976931348623157E308" minWidth="280.0" prefWidth="300.0" spacing="8.0" styleClass="form-panel panel-card" BorderPane.alignment="CENTER">
-         <padding>
-            <Insets bottom="16.0" left="12.0" right="12.0" top="12.0" />
-         </padding>
-         <children>
-            <Label styleClass="field-label" text="Resource Categories" />
-            <TreeView fx:id="categoryTree" VBox.vgrow="ALWAYS" />
-            <HBox spacing="6.0">
+            <HBox alignment="CENTER_LEFT" spacing="16.0">
                <children>
-                  <Button fx:id="btnAddCategory" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleAddCategory" styleClass="btn-primary" text="Add" HBox.hgrow="ALWAYS">
-                     <graphic>
-                        <FontIcon iconLiteral="fas-plus" styleClass="icon-sm" />
-                     </graphic>
+                  <Button mnemonicParsing="false" onAction="#goBack" styleClass="btn-back" text="Dashboard">
+                     <graphic><FontIcon iconLiteral="fas-arrow-left" styleClass="icon-sm" /></graphic>
                   </Button>
-                  <Button fx:id="btnAddSubcategory" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleAddSubcategory" styleClass="btn-neutral" text="Add Sub" HBox.hgrow="ALWAYS">
-                     <graphic>
-                        <FontIcon iconLiteral="fas-code-branch" styleClass="icon-sm" />
-                     </graphic>
-                  </Button>
-                  <Button fx:id="btnDeleteCategory" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleDeleteCategory" styleClass="btn-danger" text="Delete" HBox.hgrow="ALWAYS">
-                     <graphic>
-                        <FontIcon iconLiteral="fas-trash" styleClass="icon-sm" />
-                     </graphic>
-                  </Button>
+                  <VBox spacing="2.0">
+                     <children>
+                        <Label styleClass="page-title, screen-title" text="Resource Master &amp; Categories" />
+                        <Label styleClass="screen-subtitle"
+                               text="Maintain the resource catalog, units, and category hierarchy used across operations."
+                               wrapText="true" />
+                     </children>
+                  </VBox>
+                  <Region HBox.hgrow="ALWAYS" />
+                  <Label styleClass="role-badge-admin" text="SYSTEM ADMIN" />
                </children>
             </HBox>
          </children>
       </VBox>
-   </left>
+   </top>
    <center>
-      <BorderPane BorderPane.alignment="CENTER">
-         <top>
-            <ScrollPane fitToWidth="true" hbarPolicy="NEVER" vbarPolicy="NEVER" BorderPane.alignment="CENTER">
-               <content>
-                  <VBox spacing="4.0" styleClass="form-panel panel-card">
-                     <padding>
-                        <Insets bottom="16.0" left="16.0" right="16.0" top="12.0" />
-                     </padding>
+      <SplitPane dividerPositions="0.30" styleClass="workspace-split" BorderPane.alignment="CENTER">
+         <items>
+            <VBox minWidth="280.0" prefWidth="340.0" spacing="12.0"
+                  styleClass="form-panel, workspace-card, category-panel">
+               <children>
+                  <HBox alignment="CENTER_LEFT" spacing="10.0">
                      <children>
-                        <Label fx:id="errorLabel" maxWidth="1.7976931348623157E308" minHeight="18.0" styleClass="login-error" text="" wrapText="true" />
-                        <HBox spacing="16.0">
+                        <FontIcon iconLiteral="fas-tags" styleClass="panel-heading-icon" />
+                        <VBox spacing="2.0">
                            <children>
-                              <VBox spacing="4.0" HBox.hgrow="ALWAYS">
+                              <Label styleClass="panel-title" text="Category hierarchy" />
+                              <Label styleClass="panel-description" text="Choose a category to prefill the resource form." wrapText="true" />
+                           </children>
+                        </VBox>
+                     </children>
+                  </HBox>
+
+                  <TreeView fx:id="categoryTree" minHeight="260.0" styleClass="category-tree" VBox.vgrow="ALWAYS" />
+
+                  <Separator prefWidth="200.0" />
+                  <Label styleClass="form-section-label" text="CATEGORY ACTIONS" />
+                  <VBox spacing="8.0">
+                     <children>
+                        <Button fx:id="btnAddCategory" maxWidth="1.7976931348623157E308" mnemonicParsing="false"
+                                onAction="#handleAddCategory" styleClass="btn-primary" text="Add category">
+                           <graphic><FontIcon iconLiteral="fas-plus" styleClass="icon-sm" /></graphic>
+                        </Button>
+                        <Button fx:id="btnAddSubcategory" maxWidth="1.7976931348623157E308" mnemonicParsing="false"
+                                onAction="#handleAddSubcategory" styleClass="btn-neutral" text="Add subcategory">
+                           <graphic><FontIcon iconLiteral="fas-code-branch" styleClass="icon-sm" /></graphic>
+                        </Button>
+                     </children>
+                  </VBox>
+                  <Button fx:id="btnDeleteCategory" maxWidth="1.7976931348623157E308" mnemonicParsing="false"
+                          onAction="#handleDeleteCategory" styleClass="btn-danger" text="Delete selected category">
+                     <graphic><FontIcon iconLiteral="fas-trash" styleClass="icon-sm" /></graphic>
+                  </Button>
+               </children>
+            </VBox>
+
+            <BorderPane>
+               <top>
+                  <VBox spacing="10.0" styleClass="form-panel, workspace-card, resource-form-card" BorderPane.alignment="CENTER">
+                     <children>
+                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                           <children>
+                              <FontIcon iconLiteral="fas-cubes" styleClass="panel-heading-icon" />
+                              <VBox spacing="2.0">
                                  <children>
-                                    <Label styleClass="field-label" text="Resource ID" />
-                                    <TextField fx:id="resourceIdField" promptText="e.g. R3001 (leave blank to auto-generate)" />
-                                 </children>
-                              </VBox>
-                              <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-                                 <children>
-                                    <Label styleClass="field-label" text="Unit" />
-                                    <ComboBox fx:id="unitCombo" editable="true" maxWidth="1.7976931348623157E308" promptText="e.g. packets, litres" />
+                                    <Label styleClass="panel-title" text="Resource details" />
+                                    <Label styleClass="panel-description" text="Register a resource or select a table row to edit an existing record." wrapText="true" />
                                  </children>
                               </VBox>
                            </children>
                         </HBox>
-                        <Label styleClass="field-label" text="Name" />
-                        <TextField fx:id="nameField" promptText="e.g. Paracetamol 500mg" />
-                        <Label styleClass="field-label" text="Category" />
-                        <ComboBox fx:id="categoryCombo" maxWidth="1.7976931348623157E308" promptText="Select category" />
-                        <Separator prefWidth="200.0" />
-                        <HBox minHeight="48.0" spacing="8.0">
+                        <Label fx:id="errorLabel" maxWidth="1.7976931348623157E308" minHeight="0.0"
+                               styleClass="login-error, feedback-label" text="" wrapText="true" />
+
+                        <HBox spacing="12.0">
                            <children>
-                              <Button fx:id="btnAdd" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleAdd" styleClass="btn-primary" text="Add" HBox.hgrow="ALWAYS">
-                                 <graphic>
-                                    <FontIcon iconLiteral="fas-plus" styleClass="icon-sm" />
-                                 </graphic>
+                              <VBox spacing="2.0" HBox.hgrow="ALWAYS">
+                                 <children>
+                                    <Label styleClass="field-label" text="Resource ID" />
+                                    <TextField fx:id="resourceIdField" maxWidth="1.7976931348623157E308"
+                                               promptText="e.g. R3001 (leave blank to auto-generate)" />
+                                 </children>
+                              </VBox>
+                              <VBox minWidth="190.0" spacing="2.0" HBox.hgrow="ALWAYS">
+                                 <children>
+                                    <Label styleClass="field-label" text="Unit" />
+                                    <ComboBox fx:id="unitCombo" editable="true" maxWidth="1.7976931348623157E308"
+                                              promptText="e.g. packets, litres" />
+                                 </children>
+                              </VBox>
+                           </children>
+                        </HBox>
+                        <HBox spacing="12.0">
+                           <children>
+                              <VBox spacing="2.0" HBox.hgrow="ALWAYS">
+                                 <children>
+                                    <Label styleClass="field-label" text="Resource name *" />
+                                    <TextField fx:id="nameField" maxWidth="1.7976931348623157E308"
+                                               promptText="e.g. Paracetamol 500mg" />
+                                 </children>
+                              </VBox>
+                              <VBox minWidth="240.0" spacing="2.0" HBox.hgrow="ALWAYS">
+                                 <children>
+                                    <Label styleClass="field-label" text="Category *" />
+                                    <ComboBox fx:id="categoryCombo" maxWidth="1.7976931348623157E308"
+                                              promptText="Select a category" />
+                                 </children>
+                              </VBox>
+                           </children>
+                        </HBox>
+
+                        <Separator prefWidth="200.0" />
+                        <HBox minHeight="44.0" spacing="8.0">
+                           <children>
+                              <Button fx:id="btnAdd" maxWidth="1.7976931348623157E308" mnemonicParsing="false"
+                                      onAction="#handleAdd" styleClass="btn-primary" text="Add resource" HBox.hgrow="ALWAYS">
+                                 <graphic><FontIcon iconLiteral="fas-plus" styleClass="icon-sm" /></graphic>
                               </Button>
-                              <Button fx:id="btnUpdate" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleUpdate" styleClass="btn-success" text="Update" HBox.hgrow="ALWAYS">
-                                 <graphic>
-                                    <FontIcon iconLiteral="fas-edit" styleClass="icon-sm" />
-                                 </graphic>
+                              <Button fx:id="btnUpdate" maxWidth="1.7976931348623157E308" mnemonicParsing="false"
+                                      onAction="#handleUpdate" styleClass="btn-success" text="Update" HBox.hgrow="ALWAYS">
+                                 <graphic><FontIcon iconLiteral="fas-edit" styleClass="icon-sm" /></graphic>
                               </Button>
-                              <Button fx:id="btnDelete" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleDelete" styleClass="btn-danger" text="Delete" HBox.hgrow="ALWAYS">
-                                 <graphic>
-                                    <FontIcon iconLiteral="fas-trash" styleClass="icon-sm" />
-                                 </graphic>
+                              <Button fx:id="btnDelete" maxWidth="1.7976931348623157E308" mnemonicParsing="false"
+                                      onAction="#handleDelete" styleClass="btn-danger" text="Delete" HBox.hgrow="ALWAYS">
+                                 <graphic><FontIcon iconLiteral="fas-trash" styleClass="icon-sm" /></graphic>
                               </Button>
-                              <Button fx:id="btnFind" maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleFind" styleClass="btn-neutral" text="Find" HBox.hgrow="ALWAYS">
-                                 <graphic>
-                                    <FontIcon iconLiteral="fas-search" styleClass="icon-sm" />
-                                 </graphic>
+                              <Button fx:id="btnFind" maxWidth="1.7976931348623157E308" mnemonicParsing="false"
+                                      onAction="#handleFind" styleClass="btn-neutral" text="Find" HBox.hgrow="ALWAYS">
+                                 <graphic><FontIcon iconLiteral="fas-search" styleClass="icon-sm" /></graphic>
                               </Button>
-                              <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false" onAction="#handleClear" styleClass="btn-outline" text="Clear" HBox.hgrow="ALWAYS">
-                                 <graphic>
-                                    <FontIcon iconLiteral="fas-eraser" styleClass="icon-sm" />
-                                 </graphic>
+                              <Button maxWidth="1.7976931348623157E308" mnemonicParsing="false"
+                                      onAction="#handleClear" styleClass="btn-outline" text="Clear" HBox.hgrow="ALWAYS">
+                                 <graphic><FontIcon iconLiteral="fas-eraser" styleClass="icon-sm" /></graphic>
                               </Button>
                            </children>
                         </HBox>
                      </children>
+                     <BorderPane.margin><Insets bottom="14.0" /></BorderPane.margin>
                   </VBox>
-               </content>
-            </ScrollPane>
-         </top>
-         <center>
-            <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" spacing="10.0" styleClass="content-area panel-card" BorderPane.alignment="CENTER">
-               <padding>
-                  <Insets bottom="24.0" left="16.0" right="16.0" top="16.0" />
-               </padding>
-               <children>
-                  <TableView fx:id="resourceTable" minHeight="200.0" minWidth="400.0" VBox.vgrow="ALWAYS">
-                     <columns>
-                        <TableColumn fx:id="colResourceId" minWidth="80.0" prefWidth="100.0" text="Resource ID" />
-                        <TableColumn fx:id="colName" minWidth="160.0" prefWidth="240.0" text="Name" />
-                        <TableColumn fx:id="colCategory" minWidth="140.0" prefWidth="200.0" text="Category" />
-                        <TableColumn fx:id="colUnit" minWidth="80.0" prefWidth="100.0" text="Unit" />
-                     </columns>
-                  </TableView>
-               </children>
-            </VBox>
-         </center>
-      </BorderPane>
+               </top>
+               <center>
+                  <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" spacing="12.0"
+                        styleClass="content-area, panel-card, records-panel" BorderPane.alignment="CENTER">
+                     <children>
+                        <HBox alignment="CENTER_LEFT" spacing="10.0">
+                           <children>
+                              <FontIcon iconLiteral="fas-list" styleClass="panel-heading-icon" />
+                              <VBox spacing="2.0">
+                                 <children>
+                                    <Label styleClass="panel-title" text="Resource catalog" />
+                                    <Label styleClass="panel-description" text="Current resources and their assigned categories and units." />
+                                 </children>
+                              </VBox>
+                              <Region HBox.hgrow="ALWAYS" />
+                              <Label styleClass="data-badge" text="LIVE CATALOG" />
+                           </children>
+                        </HBox>
+                        <TableView fx:id="resourceTable" minHeight="240.0" minWidth="480.0" styleClass="records-table" VBox.vgrow="ALWAYS">
+                           <columns>
+                              <TableColumn fx:id="colResourceId" minWidth="100.0" prefWidth="120.0" text="Resource ID" />
+                              <TableColumn fx:id="colName" minWidth="180.0" prefWidth="280.0" text="Name" />
+                              <TableColumn fx:id="colCategory" minWidth="170.0" prefWidth="240.0" text="Category" />
+                              <TableColumn fx:id="colUnit" minWidth="100.0" prefWidth="130.0" text="Unit" />
+                           </columns>
+                        </TableView>
+                     </children>
+                     <padding><Insets bottom="20.0" left="20.0" right="20.0" top="20.0" /></padding>
+                  </VBox>
+               </center>
+            </BorderPane>
+         </items>
+      </SplitPane>
    </center>
 </BorderPane>

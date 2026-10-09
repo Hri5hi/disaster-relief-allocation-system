@@ -62,6 +62,8 @@ public class AnalyticsController extends Utility {
     }
 
     @FXML private Label pageTitleLabel;
+    @FXML private Label pageSubtitleLabel;
+    @FXML private Label roleBadge;
     @FXML private Label errorLabel;
     @FXML private ComboBox<String> disasterFilterCombo;
     @FXML private TabPane analyticsTabPane;
@@ -106,6 +108,7 @@ public class AnalyticsController extends Utility {
         colDeficitAvailable.setCellValueFactory(new PropertyValueFactory<>("available"));
         colDeficitAmount.setCellValueFactory(new PropertyValueFactory<>("deficit"));
         colDeficitUrgency.setCellValueFactory(new PropertyValueFactory<>("urgency"));
+        deficitTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
 
         colDeficitUrgency.setCellFactory(col -> new TableCell<>() {
             @Override
@@ -121,6 +124,27 @@ public class AnalyticsController extends Utility {
             }
         });
 
+        colDeficitAmount.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(String deficit, boolean empty) {
+                super.updateItem(deficit, empty);
+                getStyleClass().removeAll("deficit-positive", "deficit-clear");
+                if (empty || deficit == null) {
+                    setText(null);
+                    return;
+                }
+                setText(deficit);
+                try {
+                    getStyleClass().add(Long.parseLong(deficit) > 0
+                            ? "deficit-positive"
+                            : "deficit-clear");
+                } catch (NumberFormatException ignored) {
+                    // Keep the value visible without a status color if a report
+                    // source ever supplies a non-numeric deficit label.
+                }
+            }
+        });
+
         deficitTable.setItems(deficitList);
 
         applyRoleRestrictions();
@@ -131,12 +155,37 @@ public class AnalyticsController extends Utility {
         UserRole role = UserSession.getInstance().getRole();
 
         if (role == UserRole.ZONE_COORDINATOR) {
-            pageTitleLabel.setText("Zone Deficit Status");
+            applyRoleContext(
+                    "Zone Deficit Status",
+                    "Review zone-scoped shortages and urgency for the selected disaster.",
+                    "ZONE SCOPED",
+                    "role-badge-zone");
             analyticsTabPane.getTabs().removeAll(categoryRollupTab, consumptionTrendTab, distributionTab);
             analyticsTabPane.getSelectionModel().select(deficitTab);
         } else if (role == UserRole.ANALYTICS_USER) {
-            pageTitleLabel.setText("Executive Analytics & Decision Support");
+            applyRoleContext(
+                    "Executive Analytics & Decision Support",
+                    "Explore shortages, inventory mix, consumption, and distribution trends.",
+                    "ANALYTICS USER",
+                    "role-badge-analytics");
+        } else {
+            applyRoleContext(
+                    "Analytics & Reports",
+                    "Monitor shortages, inventory mix, consumption, and distribution activity.",
+                    "SYSTEM ADMIN",
+                    "role-badge-admin");
         }
+    }
+
+    /** Applies presentation-only role context; access remains enforced by navigation RBAC. */
+    private void applyRoleContext(String title, String subtitle, String badgeText,
+                                  String badgeStyleClass) {
+        pageTitleLabel.setText(title);
+        pageSubtitleLabel.setText(subtitle);
+        roleBadge.setText(badgeText);
+        roleBadge.getStyleClass().removeAll(
+                "role-badge-admin", "role-badge-zone", "role-badge-analytics");
+        roleBadge.getStyleClass().add(badgeStyleClass);
     }
 
     private void loadDisastersAndAnalytics() {

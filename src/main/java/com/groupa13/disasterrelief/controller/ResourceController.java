@@ -75,6 +75,7 @@ public class ResourceController extends Utility {
                 new ReadOnlyStringWrapper(cell.getValue().categoryPath()));
         colUnit.setCellValueFactory(cell -> new ReadOnlyStringWrapper(
                 cell.getValue().unit() == null ? "—" : cell.getValue().unit()));
+        resourceTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         resourceTable.setItems(dataList);
         resourceTable.getSelectionModel().selectedItemProperty().addListener(
                 (ignored, previous, selected) -> populateForm(selected));
